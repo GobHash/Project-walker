@@ -1,0 +1,6 @@
+este link de abajo es uno de los params que envia cuando se cambia la pag en las 
+este es el primer param del post:
+   MasterGC$ContentBlockHolder$ScriptManager1-> "MasterGC$ContentBlockHolder$UpdatePanel1|MasterGC$ContentBlockHolder$dgResultado$ctl54$ctl[aqui van los digitos de la pag que pido]"
+
+este es el segundo param del post:
+   __EVENTTARGET-> "MasterGC$ContentBlockHolder$dgResultado$ctl54$ctl[aqui van los digitos de la pag que pido]"
