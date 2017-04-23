@@ -1,0 +1,13 @@
+MasterGC%24ContentBlockHolder%24ScriptManager1=MasterGC%24ContentBlockHolder%24UpdatePanel1%7CMasterGC%24ContentBlockHolder%24Button1
+MasterGC%24ContentBlockHolder%24rdbOpciones=5
+MasterGC%24ContentBlockHolder%24txtFechaIni=
+MasterGC%24ContentBlockHolder%24txtFechaFin=
+MasterGC%24ContentBlockHolder%24txtMontoIni=
+MasterGC%24ContentBlockHolder%24txtMontoFin=
+MasterGC%24ContentBlockHolder%24ddlTipoProv=
+__EVENTTARGET=
+__EVENTARGUMENT=
+__LASTFOCUS=
+__VIEWSTATE=
+__ASYNCPOST=
+MasterGC%24ContentBlockHolder%24Button1=

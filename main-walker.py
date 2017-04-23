@@ -61,11 +61,11 @@ def scrapeyear(year, log):
     year_page = "{}{}{}".format(BASE_URL_PROVEEDORES, '/consultaProveeAdjLst.aspx?lper=', str(year))
     #genero el objeto de tipo request
     req = requests.Request('GET', year_page, headers=HEADERS)
-    
+
     #ahora preparo el objeto request con los atributos del objeto SESSION
     prepped = SESSION.prepare_request(req)
     response = SESSION.send(prepped)
-    
+
     if response.status_code != 200:
         log += "Error at request {}, got error: {}".format(req.headers, response.status_code)
         #terminar de escribir el log antes de salir
@@ -76,10 +76,10 @@ def scrapeyear(year, log):
         pags = tabla.find('tr', attrs={'class': 'TablaPagineo'})
         print pags
         page_object = response.content
-        #scrapeproveedores(page_object, year)
+        #get_prov_adj(page_object, year)
 
 
-def scrapeproveedores(html, year):
+def get_prov_adj(html, year):
     """poner doc
     """
 
@@ -87,16 +87,25 @@ def scrapeproveedores(html, year):
     #obtengo la tabla que tiene los resultados de los proveedores
     tabla = soup.find('table', attrs={'id': 'MasterGC_ContentBlockHolder_dgResultado'})
     proveedores = []
+    links_proov = []
     for link in tabla.find_all('a'):
         if link.get('href').endswith(str(year)):
-            proveedores.append(link.get('href'))
-    print proveedores
-
+            #esto se hace para quitar el punto del inicio de la url
+            tmp_url = link.get('href')[1:]
+            links_proov.append(tmp_url)
     
-    """for row in table.findAll('tr', attrs={'class': 'TablaFila1'}):
+    
+    """
+    for row in tabla.findAll('tr', attrs={'class': 'TablaFila1'}):
         print row
-    for row in table.findAll('tr', attrs={'class': 'TablaFila2'}):
+    for row in tabla.findAll('tr', attrs={'class': 'TablaFila2'}):
         print row
     """
+def scrape_adjudicacion():
+    pass    
+
+
 #scrapedata()
 scrapeyear(2016,"")
+
+
