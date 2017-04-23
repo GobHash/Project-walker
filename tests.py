@@ -5,6 +5,7 @@ module solely made for testing purposes
 from bs4 import BeautifulSoup
 import requests
 import calendar
+import re
 
 URL = 'http://www.guatecompras.gt/Proveedores/ConsultaProveeAdj.aspx'
 BASE_URL_PROVEEDORES = "http://www.guatecompras.gt/Proveedores"
@@ -41,25 +42,65 @@ def alternativa_dias():
     #eventTarget
     #MasterGC$ContentBlockHolder$rdbOpciones$4
 #MasterGC$ContentBlockHolder$ScriptManager1|MasterGC$ContentBlockHolder$rdbOpciones$4
+    
+    print '*****'
     data = {'MasterGC$ContentBlockHolder$ScriptManager1': 'MasterGC$ContentBlockHolder$ScriptManager1|MasterGC$ContentBlockHolder$rdbOpciones$4',
             'MasterGC$ContentBlockHolder$rdbOpciones': '5',
             '__EVENTTARGET': 'MasterGC$ContentBlockHolder$rdbOpciones$4',
             '__EVENTARGUMENT':'',
             '__LASTFOCUS': '',
-            '__VIEWSTATE': viewstate,
-            '__VIEWSTATEGENERATOR': viewstate_gen,
-            '__EVENTVALIDATION': event_val,
+            '__VIEWSTATE': viewstate.get('value'),
+            '__VIEWSTATEGENERATOR': viewstate_gen.get('value'),
+            '__EVENTVALIDATION': event_val.get('value'),
             '__ASYNCPOST': 'true'}
 
 
     req = requests.Request('POST', LA_URL, headers=HEADERS, data=data)
     prepped = SESSION.prepare_request(req)
     response = SESSION.send(prepped)
-    print response.content
+    #print response.content
     mydf = open('pag2.html', 'w')
     mydf.writelines(response.content)
     mydf.close()
-    #print viewstate_gen.get('value')
+    
+#esta es la parte donde recibo los params despues del primer POST
+    contenido = response.content
+    soup = BeautifulSoup(contenido, 'lxml')
+    event_tgt = soup.find('input', attrs={'id': '__EVENTTARGET'})
+    event_arg = soup.find('input', attrs={'id': '__EVENTARGUMENT'})
+    event_arg = soup.find('input', attrs={'id': '__LASTFOCUS'})
+    viewstate = soup.find('input', attrs={'id': '__VIEWSTATE'})
+    viewstate_gen = soup.find('input', attrs={'id': '__VIEWSTATEGENERATOR'})
+    event_val = soup.find('input', attrs={'id': '__EVENTVALIDATION'})
+
+    lista_algo = soup.find_all('span', attrs={'style': 'display: none ! important;'})
+    val1=contenido.index('|0|hiddenField|__EVENTTARGET|')
+    val2=contenido.index('|77|asyncPostBackControlIDs|')
+    importante = contenido[val1:val2]
+    el_contenedor = re.split(r'\|', importante)
+    mind=el_contenedor.index('__VIEWSTATEGENERATOR')+1
+    tkn=el_contenedor[mind]
+    
+    
+    data['MasterGC$ContentBlockHolder$txtFechaIni'] = '01.enero.2016'
+    data['MasterGC$ContentBlockHolder$txtFechaFin'] = '01.enero.2016'
+    data['MasterGC$ContentBlockHolder$txtMontoIni'] = ''
+    data['MasterGC$ContentBlockHolder$txtMontoFin'] = ''
+    data['MasterGC$ContentBlockHolder$ddlTipoProv']  = '1'
+    data['__VIEWSTATE'] = el_contenedor[el_contenedor.index('__VIEWSTATE')+1]
+    data['__VIEWSTATEGENERATOR'] = el_contenedor[el_contenedor.index('__VIEWSTATEGENERATOR')+1]
+    data['__EVENTVALIDATION'] = el_contenedor[el_contenedor.index('__EVENTVALIDATION')+1]
+    data['MasterGC$ContentBlockHolder$Button1'] = 'Consultar'
+    
+    req = requests.Request('POST', LA_URL, headers=HEADERS, data=data)
+    prepped = SESSION.prepare_request(req)
+    response = SESSION.send(prepped)
+    
+    mydf = open('pag3.html', 'w')
+    mydf.writelines(response.content)
+    mydf.close()
+    
+
     year = 2016
     
 
