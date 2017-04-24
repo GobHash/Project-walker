@@ -12,10 +12,13 @@ BASE_URL_PROVEEDORES = "http://www.guatecompras.gt/Proveedores"
 BASE_URL_COMPRADORES = "http://www.guatecompras.gt/compradores"
 BASE_URL_ADJUDICACIONES = "http://www.guatecompras.gt/Concursos/consultaDetalleCon.aspx?"
 HEADERS = requests.utils.default_headers()
-HEADERS.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0'})
+HEADERS.update({'User-Agent': 'TESTINGMozilla/5.0 (Windows NT 10.0'})
 SESSION = requests.Session()
 my_c = calendar.Calendar()
 mc_ew = my_c.itermonthdates(2016,1)
+INDEX_VIEWSTATE = 15
+INDEX_VIEWSTATEGEN = 19
+INDEX_EVENTVAL = 23
 
 LA_URL = 'http://guatecompras.gt/proveedores/consultaadvprovee.aspx'
 def alternativa_dias():
@@ -54,7 +57,7 @@ def alternativa_dias():
             '__EVENTVALIDATION': event_val.get('value'),
             '__ASYNCPOST': 'true'}
 
-
+    
     req = requests.Request('POST', LA_URL, headers=HEADERS, data=data)
     prepped = SESSION.prepare_request(req)
     response = SESSION.send(prepped)
@@ -65,15 +68,7 @@ def alternativa_dias():
     
 #esta es la parte donde recibo los params despues del primer POST
     contenido = response.content
-    soup = BeautifulSoup(contenido, 'lxml')
-    event_tgt = soup.find('input', attrs={'id': '__EVENTTARGET'})
-    event_arg = soup.find('input', attrs={'id': '__EVENTARGUMENT'})
-    event_arg = soup.find('input', attrs={'id': '__LASTFOCUS'})
-    viewstate = soup.find('input', attrs={'id': '__VIEWSTATE'})
-    viewstate_gen = soup.find('input', attrs={'id': '__VIEWSTATEGENERATOR'})
-    event_val = soup.find('input', attrs={'id': '__EVENTVALIDATION'})
-
-    lista_algo = soup.find_all('span', attrs={'style': 'display: none ! important;'})
+    
     val1=contenido.index('|0|hiddenField|__EVENTTARGET|')
     val2=contenido.index('|77|asyncPostBackControlIDs|')
     importante = contenido[val1:val2]
@@ -82,25 +77,61 @@ def alternativa_dias():
     tkn=el_contenedor[mind]
     
     
-    data['MasterGC$ContentBlockHolder$txtFechaIni'] = '01.enero.2016'
-    data['MasterGC$ContentBlockHolder$txtFechaFin'] = '01.enero.2016'
+    
+    data['MasterGC$ContentBlockHolder$txtFechaIni'] = '10.abril.2017'
+    data['MasterGC$ContentBlockHolder$txtFechaFin'] = '10.abril.2017'
     data['MasterGC$ContentBlockHolder$txtMontoIni'] = ''
     data['MasterGC$ContentBlockHolder$txtMontoFin'] = ''
-    data['MasterGC$ContentBlockHolder$ddlTipoProv']  = '1'
-    data['__VIEWSTATE'] = el_contenedor[el_contenedor.index('__VIEWSTATE')+1]
-    data['__VIEWSTATEGENERATOR'] = el_contenedor[el_contenedor.index('__VIEWSTATEGENERATOR')+1]
-    data['__EVENTVALIDATION'] = el_contenedor[el_contenedor.index('__EVENTVALIDATION')+1]
+    data['MasterGC$ContentBlockHolder$ddlTipoProv'] = '1'
+    data['__VIEWSTATE'] = el_contenedor[INDEX_VIEWSTATE+1]
+    data['__VIEWSTATEGENERATOR'] = el_contenedor[INDEX_VIEWSTATEGEN+1]
+    data['__EVENTVALIDATION'] = el_contenedor[INDEX_EVENTVAL+1]
     data['MasterGC$ContentBlockHolder$Button1'] = 'Consultar'
     
     req = requests.Request('POST', LA_URL, headers=HEADERS, data=data)
     prepped = SESSION.prepare_request(req)
     response = SESSION.send(prepped)
+
     
     mydf = open('pag3.html', 'w')
     mydf.writelines(response.content)
     mydf.close()
-    
 
+    #para la prueba del paginamiento
+    # este es el nuevo elemento del script
+    #MasterGC$ContentBlockHolder$UpdatePanel2|MasterGC$ContentBlockHolder$dgResultado$ctl54$ctlNUMPAGINA
+    contenido = response.content
+    val1=contenido.index('|0|hiddenField|__EVENTTARGET|')
+    val2=contenido.index('|77|asyncPostBackControlIDs|')
+    importante = contenido[val1:val2]
+    el_contenedor = re.split(r'\|', importante)
+    print "----"
+    print len(el_contenedor)
+    del data['MasterGC$ContentBlockHolder$Button1']
+    data['__VIEWSTATE'] = el_contenedor[el_contenedor.index('__VIEWSTATE')+1]
+    data['__VIEWSTATEGENERATOR'] = el_contenedor[el_contenedor.index('__VIEWSTATEGENERATOR')+1]
+    data['__EVENTVALIDATION'] = el_contenedor[el_contenedor.index('__EVENTVALIDATION')+1]
+    data['MasterGC$ContentBlockHolder$ScriptManager1'] = 'MasterGC$ContentBlockHolder$UpdatePanel2|MasterGC$ContentBlockHolder$dgResultado$ctl54$ctl02'
+    data['__EVENTTARGET'] = 'MasterGC$ContentBlockHolder$dgResultado$ctl54$ctl02'
+
+    req = requests.Request('POST', LA_URL, headers=HEADERS, data=data)
+    prepped = SESSION.prepare_request(req)
+    response = SESSION.send(prepped)
+    mydf = open('pag4.html', 'w')
+    mydf.writelines(response.content)
+    mydf.close()
+    year = 2017
+    soup = BeautifulSoup(response.content, 'lxml')
+    tabla = soup.find('table', attrs={'id': 'MasterGC_ContentBlockHolder_dgResultado'})
+    links_proov = []
+    adjudicaciones = []
+    for link in tabla.find_all('a'):
+        if link.get('href').endswith('o=9'):
+            #esto se hace para quitar el punto del inicio de la url
+            tmp_url = link.get('href')[1:]
+            
+            links_proov.append(tmp_url)
+    print links_proov
     year = 2016
     
 
