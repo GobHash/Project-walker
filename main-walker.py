@@ -8,6 +8,7 @@ import calendar
 import datetime
 import logging
 import re
+from math import ceil
 
 import requests
 from bs4 import BeautifulSoup
@@ -31,9 +32,11 @@ POST_PARAMS = {'MasterGC$ContentBlockHolder$ScriptManager1': '',
                '__VIEWSTATEGENERATOR': '',
                '__EVENTVALIDATION': '',
                '__ASYNCPOST': 'true'}
+
 #esto sirve para que las cookies sean persistentes entre requests
 SESSION = requests.Session()
-
+MAYORDIA = ''
+VALORDIA = 0
 def scrapedata():
     """
     this
@@ -92,7 +95,7 @@ def scrape_month(year, month):
     response = SESSION.send(prepped)
     logging.info('Voy a hacer el GET de la main URL (pag1.html) para el mes %s/%s', month, year)
     if response.status_code != OK_CODE:
-        logging.error('La request de la main URL fue fallida, el codigo del server fue %s', response.status_code)
+        logging.error('La request de la main URL fallida, error %s', response.status_code)
         return
     logging.debug('Requeste de la main URL completado exitosamente')
 
@@ -114,7 +117,7 @@ def scrape_month(year, month):
     req = requests.Request('POST', MAIN_URL, headers=HEADERS, data=my_params)
     prepped = SESSION.prepare_request(req)
     response = SESSION.send(prepped)
-    
+
     if response.status_code != OK_CODE:
         logging.error('La request del primer POST recibe el codigo %s, del server', response.status_code)
         return
@@ -123,28 +126,20 @@ def scrape_month(year, month):
     #ahora toca ir pidiendo los dias
     contenido = response.content
 
-    #en el responde de la pag estos son los campos que delimitan la info que sirve
-    mark1 = contenido.index('|0|hiddenField|__EVENTTARGET|')
-    mark2 = contenido.index('|asyncPostBackControlIDs|')
-    importante = contenido[mark1:mark2]
-    el_contenedor = re.split(r'\|', importante)
-
-
-    tokens = []
-    tokens.append(el_contenedor[el_contenedor.index('__VIEWSTATE')+1])
-    tokens.append(el_contenedor[el_contenedor.index('__VIEWSTATEGENERATOR')+1])
-    tokens.append(el_contenedor[el_contenedor.index('__EVENTVALIDATION')+1])
-
-    logging.debug('ya fueron actualizados los tokens para el siguiente request, POST, del mes %s', month)
+    tokens = obtain_tokens(contenido)
+    logging.debug('ya fueron actualizados los tokens para el siguiente request(POST) del mes %s', month)
 
     #creo el calendario para iterar sobre las fechas requeridas
-
     lista_dias = CALENDARIO.itermonthdates(year, int(month))
+
+    scrape_day(27,9,2016,tokens)
+    return
     for mi_dia in lista_dias:
         el_dia = str(mi_dia)[5:7]
         if el_dia == month:
             print mi_dia
-            tokens = scrape_day(str(mi_dia)[8:], month, year, tokens)
+            #tokens = scrape_day(str(mi_dia)[8:], month, year, tokens)
+            scrape_day(str(mi_dia)[8:], month, year, tokens)
 
 
 
@@ -169,16 +164,71 @@ def scrape_day(day, month, year, tokens):
     req = requests.Request('POST', MAIN_URL, headers=HEADERS, data=my_params)
     prepped = SESSION.prepare_request(req)
     response = SESSION.send(prepped)
+
     mydf = open('main3.html', 'w')
     mydf.writelines(response.content)
     mydf.close()
+
     if response.status_code != OK_CODE:
-        logging.error('Request para los datos del %s/%s/%s fallida, codigo de respuesta del server: %s', day, month, year, response.status_code)
+        logging.error('Request fallida, codigo de respuesta: %s', response.status_code)
         raise ValueError('error al obtener el los datos del dia')
 
     logging.debug('Ya tengo tengo el response (pag3.html) completado exitosamente')
     contenido = response.content
+
+    #se quita el caracter de la flecha que causa error al parsear
+    contenido = contenido.replace('&#9660', '&#033')
+
+    soup = BeautifulSoup(contenido, 'lxml')
+
+    # si no hay resultados este elemento no viene
+    totales = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_lblFilas'})
+    if totales is None:
+        logging.info('No hay adjudicaciones para este dia')
+        return
+
+    init = totales.contents[0].index('de')
+    fin = totales.contents[0].index('adjudicaciones')
+    total_dia = int(totales.contents[0][init+2:fin].strip())
+    num_pags = int(ceil(total_dia/50.))
     
+    logging.info('Para este dia hay %s adjudicaciones', total_dia)
+
+    #tabla = soup.findAll('tr', attrs={'class': re.compile('TablaFilaMix.')})
+
+    del my_params['MasterGC$ContentBlockHolder$Button1']
+    new_tokens = obtain_tokens(contenido)
+    my_params['__VIEWSTATE'] = new_tokens[0]
+    my_params['__VIEWSTATEGENERATOR'] = new_tokens[1]
+    my_params['__EVENTVALIDATION'] = new_tokens[2]
+
+    for pag_actual in range(1, num_pags):
+        if pag_actual < 10:
+            my_params['MasterGC$ContentBlockHolder$ScriptManager1'] = 'MasterGC$ContentBlockHolder$UpdatePanel2|MasterGC$ContentBlockHolder$dgResultado$ctl54$ctl0{}'.format(pag_actual)
+            my_params['__EVENTTARGET'] = 'MasterGC$ContentBlockHolder$dgResultado$ctl54$ctl0{}'.format(pag_actual)
+        else:
+            my_params['MasterGC$ContentBlockHolder$ScriptManager1'] = 'MasterGC$ContentBlockHolder$UpdatePanel2|MasterGC$ContentBlockHolder$dgResultado$ctl54$ctl{}'.format(pag_actual)
+            my_params['__EVENTTARGET'] = 'MasterGC$ContentBlockHolder$dgResultado$ctl54$ctl{}'.format(pag_actual)
+
+            logging.debug('voy a pedir la pag %s', pag_actual)
+            req = requests.Request('POST', MAIN_URL, headers=HEADERS, data=my_params)
+            prepped = SESSION.prepare_request(req)
+            response = SESSION.send(prepped)
+            mydf = open('subPag{}.html'.format(pag_actual), 'w')
+            contenido = response.content
+            mydf.writelines(contenido)
+            mydf.close()
+        print pag_actual
+    """
+    mydf = open('dias.txt', 'a')
+    VALORDIA = valor_d
+    MAYORDIA = '{}/{}/{}'.format(day, month, year)
+    mydf.write('{} - {}\n'.format(MAYORDIA, VALORDIA))
+    mydf.close()
+    """
+
+    #print 'para el dia {}, hay '.format(day), valor_d
+
     #actualizar los tokens para la siguiente ejecucion
     mark1 = contenido.index('|0|hiddenField|__EVENTTARGET|')
     mark2 = contenido.index('|asyncPostBackControlIDs|')
@@ -191,11 +241,63 @@ def scrape_day(day, month, year, tokens):
     logging.info('obtenida exitosamente la info para el %s/%s/%s', day, month, year)
     return tokens
 
+def obtain_tokens(contenido):
+    """
+    metodo encargado de sacar los tokens que vienen
+    en la respuesta del servidor
+    """
+    #en el responde de la pag estos son los campos que delimitan la info que sirve
+    mark1 = contenido.index('|0|hiddenField|__EVENTTARGET|')
+    mark2 = contenido.index('|asyncPostBackControlIDs|')
+    importante = contenido[mark1:mark2]
+    el_contenedor = re.split(r'\|', importante)
+    tokens = []
+    tokens.append(el_contenedor[el_contenedor.index('__VIEWSTATE')+1])
+    tokens.append(el_contenedor[el_contenedor.index('__VIEWSTATEGENERATOR')+1])
+    tokens.append(el_contenedor[el_contenedor.index('__EVENTVALIDATION')+1])
+    return tokens
+
 def get_prov_adj(html, year):
     """poner doc
     """
 
+
     soup = BeautifulSoup(html, 'lxml')
+    tabla = soup.findAll('tr', attrs={'class': re.compile('TablaFilaMix.')})
+    totales = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_lblFilas'})
+    init = totales.contents[0].index('de')
+    fin = totales.contents[0].index('adjudicaciones')
+    print int(totales.contents[0][init+2:fin].strip())
+
+    print totales.contents
+    for elem  in tabla:
+        #print elem.contents
+        """
+        este es el modelo de cada fila de TAG que regresa guatecompras
+        lo que nos interesa son el nombre y nit del proveedor para saber
+        si hay que obtener su informacion o ya la obtuvimos anteriormente
+        NOMBRE es elemento en posicion 2
+        NIT es elemento en posicion 3
+        [u'\n',
+        <td align="left" style="width:10%;">19.feb..2016</td>,
+        <td><a href="/proveedores/consultaDetProvee.aspx?rqp=4&amp;lprv=4397263" style="display:block" target="_blank"> INVERSIONES YOJUSA, SOCIEDAD ANONIMA</a></td>,
+        <td align="left" style="width:10%;">66587727</td>,
+        <td align="left" style="width:15%;">11,960.10</td>,
+        <td align="left"><a href="/concursos/consultaDetalleCon.aspx?nog=4522540&amp;o=9">4522540</a></td>,
+        u'\n']
+        """
+
+        # link hacia la adj -> elem.contents[5].find('a').get('href')
+        # nombre del proveedor -> elem.contents[2].find('a').string
+        # NIT del proveedor -> elem.contents[3].string
+        #print elem.contents[5].find('a').get('href'), elem.contents[2].find('a').string, elem.contents[3].string
+        pass
+
+    #print tabla.find_all('a')
+    #for ele in tabla:
+        #print ele.get('a')
+    #print tabla
+    """
     #obtengo la tabla que tiene los resultados de los proveedores
     tabla = soup.find('table', attrs={'id': 'MasterGC_ContentBlockHolder_dgResultado'})
     proveedores = []
@@ -205,9 +307,7 @@ def get_prov_adj(html, year):
             #esto se hace para quitar el punto del inicio de la url
             tmp_url = link.get('href')[1:]
             links_proov.append(tmp_url)
-    
-    
-    """
+
     for row in tabla.findAll('tr', attrs={'class': 'TablaFila1'}):
         print row
     for row in tabla.findAll('tr', attrs={'class': 'TablaFila2'}):
@@ -217,5 +317,18 @@ def scrape_adjudicacion():
     pass    
 
 
+# 12 de mayo de 2016 ese dia hay mas de 500 adj
+# lo que significa que se puede probar
+# el algoritmo para paginacion con esos datos
+scrape_month(2016, '06')
 
-scrape_month(2016, '01')
+
+#print elht
+#get_prov_adj(elht, 20)
+#20/06/2016 - 551
+#06/09/2016 - 623
+#12/09/2016 - 675
+#13/09/2016 - 637
+#14/09/2016 - 659
+#27/09/2016 - 811
+
