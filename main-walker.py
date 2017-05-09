@@ -201,24 +201,43 @@ def scrape_day(day, month, year, tokens):
     my_params['__VIEWSTATE'] = new_tokens[0]
     my_params['__VIEWSTATEGENERATOR'] = new_tokens[1]
     my_params['__EVENTVALIDATION'] = new_tokens[2]
-
-    for pag_actual in range(1, num_pags):
-        if pag_actual < 10:
-            my_params['MasterGC$ContentBlockHolder$ScriptManager1'] = 'MasterGC$ContentBlockHolder$UpdatePanel2|MasterGC$ContentBlockHolder$dgResultado$ctl54$ctl0{}'.format(pag_actual)
-            my_params['__EVENTTARGET'] = 'MasterGC$ContentBlockHolder$dgResultado$ctl54$ctl0{}'.format(pag_actual)
+    offset = num_pags%10
+    band = offset > 1
+    for pag_actual in range(2, num_pags+1):
+        if pag_actual < 12:
+            if pag_actual < 10:
+                my_params['MasterGC$ContentBlockHolder$ScriptManager1'] = 'MasterGC$ContentBlockHolder$UpdatePanel2|MasterGC$ContentBlockHolder$dgResultado$ctl54$ctl0{}'.format(pag_actual)
+                my_params['__EVENTTARGET'] = 'MasterGC$ContentBlockHolder$dgResultado$ctl54$ctl0{}'.format(pag_actual)
+            else:
+                my_params['MasterGC$ContentBlockHolder$ScriptManager1'] = 'MasterGC$ContentBlockHolder$UpdatePanel2|MasterGC$ContentBlockHolder$dgResultado$ctl54$ctl{}'.format(pag_actual)
+                my_params['__EVENTTARGET'] = 'MasterGC$ContentBlockHolder$dgResultado$ctl54$ctl{}'.format(pag_actual)
         else:
-            my_params['MasterGC$ContentBlockHolder$ScriptManager1'] = 'MasterGC$ContentBlockHolder$UpdatePanel2|MasterGC$ContentBlockHolder$dgResultado$ctl54$ctl{}'.format(pag_actual)
-            my_params['__EVENTTARGET'] = 'MasterGC$ContentBlockHolder$dgResultado$ctl54$ctl{}'.format(pag_actual)
+            la_pag = pag_actual
+            if band:
+                la_pag = la_pag - offset + 1
+            
+            if la_pag < 10:
+                my_params['MasterGC$ContentBlockHolder$ScriptManager1'] = 'MasterGC$ContentBlockHolder$UpdatePanel2|MasterGC$ContentBlockHolder$dgResultado$ctl54$ctl0{}'.format(la_pag)
+                my_params['__EVENTTARGET'] = 'MasterGC$ContentBlockHolder$dgResultado$ctl54$ctl0{}'.format(la_pag)
+            else:    
+                my_params['MasterGC$ContentBlockHolder$ScriptManager1'] = 'MasterGC$ContentBlockHolder$UpdatePanel2|MasterGC$ContentBlockHolder$dgResultado$ctl54$ctl{}'.format(la_pag)
+                my_params['__EVENTTARGET'] = 'MasterGC$ContentBlockHolder$dgResultado$ctl54$ctl{}'.format(la_pag)
+            print '--', la_pag, '--', pag_actual
+        logging.debug('voy a pedir la pag %s', pag_actual)
+        req = requests.Request('POST', MAIN_URL, headers=HEADERS, data=my_params)
+        prepped = SESSION.prepare_request(req)
+        response = SESSION.send(prepped)
+        mydf = open('subPag_{}.html'.format(pag_actual), 'w')
+        contenido = response.content
+        mydf.writelines(contenido)
+        mydf.close()
 
-            logging.debug('voy a pedir la pag %s', pag_actual)
-            req = requests.Request('POST', MAIN_URL, headers=HEADERS, data=my_params)
-            prepped = SESSION.prepare_request(req)
-            response = SESSION.send(prepped)
-            mydf = open('subPag{}.html'.format(pag_actual), 'w')
-            contenido = response.content
-            mydf.writelines(contenido)
-            mydf.close()
-        print pag_actual
+        if (pag_actual%10) == 1:
+            new_tokens = obtain_tokens(contenido)
+            my_params['__VIEWSTATE'] = new_tokens[0]
+            my_params['__VIEWSTATEGENERATOR'] = new_tokens[1]
+            my_params['__EVENTVALIDATION'] = new_tokens[2]
+
     """
     mydf = open('dias.txt', 'a')
     VALORDIA = valor_d
