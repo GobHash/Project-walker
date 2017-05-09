@@ -132,7 +132,8 @@ def scrape_month(year, month):
     #creo el calendario para iterar sobre las fechas requeridas
     lista_dias = CALENDARIO.itermonthdates(year, int(month))
 
-    scrape_day(27,9,2016,tokens)
+    #scrape_day(27,9,2016,tokens)
+    scrape_day(25,5,2016,tokens)
     return
     for mi_dia in lista_dias:
         el_dia = str(mi_dia)[5:7]
@@ -204,6 +205,7 @@ def scrape_day(day, month, year, tokens):
     offset = num_pags%10
     band = offset > 1
     for pag_actual in range(2, num_pags+1):
+
         if pag_actual < 12:
             if pag_actual < 10:
                 my_params['MasterGC$ContentBlockHolder$ScriptManager1'] = 'MasterGC$ContentBlockHolder$UpdatePanel2|MasterGC$ContentBlockHolder$dgResultado$ctl54$ctl0{}'.format(pag_actual)
@@ -231,6 +233,8 @@ def scrape_day(day, month, year, tokens):
         contenido = response.content
         mydf.writelines(contenido)
         mydf.close()
+
+        logging.debug('obtenida la pag %s de %s', pag_actual, num_pags)
 
         if (pag_actual%10) == 1:
             new_tokens = obtain_tokens(contenido)
