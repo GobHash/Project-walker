@@ -1,13 +1,16 @@
 # -*- coding: utf-8 -*-
 """
 this Script is responsible for scrapping all Adjudications on guatecompras.gt
-it starts at this page (http://www.guatecompras.gt/Proveedores/ConsultaProveeAdj.aspx)
+it starts at this page (http://guatecompras.gt/proveedores/consultaadvprovee.aspx)
 and then it asks the user, which year they want to scrape
 """
 import calendar
 import datetime
+import json
 import logging
+import os.path
 import re
+import time
 from math import ceil
 
 import requests
@@ -16,10 +19,22 @@ from bs4 import BeautifulSoup
 logging.basicConfig(filename='activity.log', level=logging.DEBUG)
 CALENDARIO = calendar.Calendar()
 MAIN_URL = 'http://guatecompras.gt/proveedores/consultaadvprovee.aspx'
-BASE_URL_PROVEEDORES = "http://www.guatecompras.gt/Proveedores"
+BASE_URL = 'http://www.guatecompras.gt'
+BASE_URL_PROVEEDORES = "http://www.guatecompras.gt"
 BASE_URL_COMPRADORES = "http://www.guatecompras.gt/compradores"
 BASE_URL_ADJUDICACIONES = "http://www.guatecompras.gt/Concursos/consultaDetalleCon.aspx?"
-MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+MESES = ['enero',
+         'febrero',
+         'marzo',
+         'abril',
+         'mayo',
+         'junio',
+         'julio',
+         'agosto',
+         'septiembre',
+         'octubre',
+         'noviembre',
+         'diciembre']
 OK_CODE = 200
 HEADERS = requests.utils.default_headers()
 HEADERS.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0'})
@@ -35,8 +50,7 @@ POST_PARAMS = {'MasterGC$ContentBlockHolder$ScriptManager1': '',
 
 #esto sirve para que las cookies sean persistentes entre requests
 SESSION = requests.Session()
-MAYORDIA = ''
-VALORDIA = 0
+
 def scrapedata():
     """
     this
@@ -44,18 +58,13 @@ def scrapedata():
     continuar = raw_input("desea seguir con algun scrapping pendiente? (y/n)")
     now = datetime.datetime.now()
     logging.info('la corrida actual comienza el %s', str(now))
-    log = ""
     if  continuar == 'y':
-        log = "-------------------------------"
-        log += "Log for completing previous run, started at: {}".format(now)
         #abrir el archivo que tiene la info de la sesion anterior y extraigo los datos necesarios
         #para seguir en el punto donde se queda
         fle = open('algo.txt')
         fle.readlines()
         #ScrapeYear("")
     else:
-        log = "-------------------------------"
-        log += "Log for current run, started at: {}".format(now)
         year = raw_input("¿De que año desea obtener los datos de ajudicacion? (minimo 2004)\n")
         try:
             year = int(year)
@@ -133,11 +142,11 @@ def scrape_month(year, month):
     lista_dias = CALENDARIO.itermonthdates(year, int(month))
 
     #scrape_day(27,9,2016,tokens)
-    scrape_day(25,5,2016,tokens)
+    scrape_day(1,11,2016,tokens)
     return
     for mi_dia in lista_dias:
-        el_dia = str(mi_dia)[5:7]
-        if el_dia == month:
+        el_mes = str(mi_dia)[5:7]
+        if el_mes == month:
             print mi_dia
             #tokens = scrape_day(str(mi_dia)[8:], month, year, tokens)
             scrape_day(str(mi_dia)[8:], month, year, tokens)
@@ -166,17 +175,17 @@ def scrape_day(day, month, year, tokens):
     prepped = SESSION.prepare_request(req)
     response = SESSION.send(prepped)
 
-    mydf = open('main3.html', 'w')
-    mydf.writelines(response.content)
-    mydf.close()
+    #mydf = open('main3.html', 'w')
+    #mydf.writelines(response.content)
+    #mydf.close()
 
     if response.status_code != OK_CODE:
         logging.error('Request fallida, codigo de respuesta: %s', response.status_code)
         raise ValueError('error al obtener el los datos del dia')
 
     logging.debug('Ya tengo tengo el response (pag3.html) completado exitosamente')
-    contenido = response.content
 
+    contenido = response.content
     #se quita el caracter de la flecha que causa error al parsear
     contenido = contenido.replace('&#9660', '&#033')
 
@@ -192,20 +201,33 @@ def scrape_day(day, month, year, tokens):
     fin = totales.contents[0].index('adjudicaciones')
     total_dia = int(totales.contents[0][init+2:fin].strip())
     num_pags = int(ceil(total_dia/50.))
-    
+
     logging.info('Para este dia hay %s adjudicaciones', total_dia)
 
-    #tabla = soup.findAll('tr', attrs={'class': re.compile('TablaFilaMix.')})
+    # hay que obtener la info de la primera pagina
+    tabla = soup.findAll('tr', attrs={'class': re.compile('TablaFilaMix.')})
+    for adjudicacion in tabla:
+        scrape_proveedor(adjudicacion.contents[2].find('a').get('href'))
+        scrape_adjudicacion(adjudicacion.contents[5].find('a').get('href'))
+        #scrape_adjudicacion()
+        # link hacia la adj -> elem.contents[5].find('a').get('href')
+        # nombre del proveedor -> elem.contents[2].find('a').string
+        # NIT del proveedor -> elem.contents[3].string
+        #print elem.contents[5].find('a').get('href'), elem.contents[2].find('a').string, elem.contents[3].string
+
+
 
     del my_params['MasterGC$ContentBlockHolder$Button1']
     new_tokens = obtain_tokens(contenido)
     my_params['__VIEWSTATE'] = new_tokens[0]
     my_params['__VIEWSTATEGENERATOR'] = new_tokens[1]
     my_params['__EVENTVALIDATION'] = new_tokens[2]
+
+    # valores necesarios para calcular el numero de pag (relativo)
     offset = num_pags%10
     band = offset > 1
-    for pag_actual in range(2, num_pags+1):
 
+    for pag_actual in range(2, num_pags+1):
         if pag_actual < 12:
             if pag_actual < 10:
                 my_params['MasterGC$ContentBlockHolder$ScriptManager1'] = 'MasterGC$ContentBlockHolder$UpdatePanel2|MasterGC$ContentBlockHolder$dgResultado$ctl54$ctl0{}'.format(pag_actual)
@@ -217,22 +239,31 @@ def scrape_day(day, month, year, tokens):
             la_pag = pag_actual
             if band:
                 la_pag = la_pag - offset + 1
-            
+
             if la_pag < 10:
                 my_params['MasterGC$ContentBlockHolder$ScriptManager1'] = 'MasterGC$ContentBlockHolder$UpdatePanel2|MasterGC$ContentBlockHolder$dgResultado$ctl54$ctl0{}'.format(la_pag)
                 my_params['__EVENTTARGET'] = 'MasterGC$ContentBlockHolder$dgResultado$ctl54$ctl0{}'.format(la_pag)
-            else:    
+            else:
                 my_params['MasterGC$ContentBlockHolder$ScriptManager1'] = 'MasterGC$ContentBlockHolder$UpdatePanel2|MasterGC$ContentBlockHolder$dgResultado$ctl54$ctl{}'.format(la_pag)
                 my_params['__EVENTTARGET'] = 'MasterGC$ContentBlockHolder$dgResultado$ctl54$ctl{}'.format(la_pag)
-            print '--', la_pag, '--', pag_actual
+
+
         logging.debug('voy a pedir la pag %s', pag_actual)
+
+        # pido la pag que necesito
         req = requests.Request('POST', MAIN_URL, headers=HEADERS, data=my_params)
         prepped = SESSION.prepare_request(req)
         response = SESSION.send(prepped)
-        mydf = open('subPag_{}.html'.format(pag_actual), 'w')
-        contenido = response.content
-        mydf.writelines(contenido)
-        mydf.close()
+
+        if response.status_code != OK_CODE:
+            logging.error('Request fallida, codigo de respuesta: %s', response.status_code)
+            raise ValueError('error al obtener la info del dia %s/%s/%s', day, month, year)
+
+        #mydf = open('subPag_{}.html'.format(pag_actual), 'w')
+        #contenido = response.content
+        #mydf.writelines(contenido)
+        #mydf.close()
+
 
         logging.debug('obtenida la pag %s de %s', pag_actual, num_pags)
 
@@ -242,6 +273,13 @@ def scrape_day(day, month, year, tokens):
             my_params['__VIEWSTATEGENERATOR'] = new_tokens[1]
             my_params['__EVENTVALIDATION'] = new_tokens[2]
 
+        contenido = contenido.replace('&#9660', '&#033')
+        soup = BeautifulSoup(contenido, 'lxml')
+        # ahora toca la parte de procesar la info que tienen las adjudicaciones
+        tabla = soup.findAll('tr', attrs={'class': re.compile('TablaFilaMix.')})
+        for adjudicacion in tabla:
+            scrape_proveedor(adjudicacion.contents[2].find('a').get('href'))
+            scrape_adjudicacion(adjudicacion.contents[5].find('a').get('href'))
     """
     mydf = open('dias.txt', 'a')
     VALORDIA = valor_d
@@ -250,19 +288,7 @@ def scrape_day(day, month, year, tokens):
     mydf.close()
     """
 
-    #print 'para el dia {}, hay '.format(day), valor_d
 
-    #actualizar los tokens para la siguiente ejecucion
-    mark1 = contenido.index('|0|hiddenField|__EVENTTARGET|')
-    mark2 = contenido.index('|asyncPostBackControlIDs|')
-    importante = contenido[mark1:mark2]
-    el_contenedor = re.split(r'\|', importante)
-    tokens = []
-    tokens.append(el_contenedor[el_contenedor.index('__VIEWSTATE')+1])
-    tokens.append(el_contenedor[el_contenedor.index('__VIEWSTATEGENERATOR')+1])
-    tokens.append(el_contenedor[el_contenedor.index('__EVENTVALIDATION')+1])
-    logging.info('obtenida exitosamente la info para el %s/%s/%s', day, month, year)
-    return tokens
 
 def obtain_tokens(contenido):
     """
@@ -336,15 +362,56 @@ def get_prov_adj(html, year):
     for row in tabla.findAll('tr', attrs={'class': 'TablaFila2'}):
         print row
     """
-def scrape_adjudicacion():
-    pass    
+def scrape_adjudicacion(data):
+    """
+    metodo que recibe el numero de adjudicacion y se encarga de obtener
+    la informacion que hay en su pagina
+    """
+    req = requests.Request('GET', '{}{}'.format(BASE_URL, data), headers=HEADERS)
+    prepped = SESSION.prepare_request(req)
+    response = SESSION.send(prepped)
+    if response.status_code != OK_CODE:
+        logging.error('Request fallida, codigo de respuesta: %s', response.status_code)
+        raise ValueError('error la pagina de la adjudicacion %s', data)
 
+    contenido = response.content
+    soup = BeautifulSoup(contenido, 'lxml')
+    #print soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_txtTitulo'})
+
+def scrape_proveedor(data):
+
+    cod = data[data.rfind('=')+1:]
+    # reviso si ya tengo la info del proveedor de manera local
+
+    if os.path.isfile('proveedores/{}.html'.format(cod)):
+        logging.debug('La informacion del proveedor %s ya esta de manera local', cod)
+
+    else:
+        logging.debug('Se va a pedir al server la info del proveedor %s', cod)
+
+        req = requests.Request('GET', '{}{}'.format(BASE_URL, data), headers=HEADERS)
+        prepped = SESSION.prepare_request(req)
+        response = SESSION.send(prepped)
+        if response.status_code != OK_CODE:
+            logging.error('Request fallida, codigo de respuesta: %s', response.status_code)
+            raise ValueError('error la pagina de la adjudicacion %s', data)
+
+        contenido = response.content
+        soup = BeautifulSoup(contenido, 'lxml')
+        mydf = open('proveedores/{}.html'.format(cod), 'a')
+        mydf.writelines(contenido)
+        mydf.close()
+
+    
 
 # 12 de mayo de 2016 ese dia hay mas de 500 adj
 # lo que significa que se puede probar
 # el algoritmo para paginacion con esos datos
-scrape_month(2016, '06')
-
+startTime = datetime.datetime.now()
+start = time.time()
+scrape_month(2016, '11')
+#scrape_adjudicacion('nog=5230837&o=9')
+print('It took {0:0.1f} seconds'.format(time.time() - start))
 
 #print elht
 #get_prov_adj(elht, 20)
@@ -354,4 +421,3 @@ scrape_month(2016, '06')
 #13/09/2016 - 637
 #14/09/2016 - 659
 #27/09/2016 - 811
-
