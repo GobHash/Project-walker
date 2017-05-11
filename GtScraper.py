@@ -142,8 +142,8 @@ def scrape_month(year, month):
     lista_dias = CALENDARIO.itermonthdates(year, int(month))
 
     #scrape_day(27,9,2016,tokens)
-    scrape_day(1,11,2016,tokens)
-    return
+    #scrape_day(1,11,2016,tokens)
+    #return
     for mi_dia in lista_dias:
         el_mes = str(mi_dia)[5:7]
         if el_mes == month:
@@ -208,7 +208,7 @@ def scrape_day(day, month, year, tokens):
     tabla = soup.findAll('tr', attrs={'class': re.compile('TablaFilaMix.')})
     for adjudicacion in tabla:
         scrape_proveedor(adjudicacion.contents[2].find('a').get('href'))
-        scrape_adjudicacion(adjudicacion.contents[5].find('a').get('href'))
+        #scrape_adjudicacion(adjudicacion.contents[5].find('a').get('href'))
         #scrape_adjudicacion()
         # link hacia la adj -> elem.contents[5].find('a').get('href')
         # nombre del proveedor -> elem.contents[2].find('a').string
@@ -279,7 +279,7 @@ def scrape_day(day, month, year, tokens):
         tabla = soup.findAll('tr', attrs={'class': re.compile('TablaFilaMix.')})
         for adjudicacion in tabla:
             scrape_proveedor(adjudicacion.contents[2].find('a').get('href'))
-            scrape_adjudicacion(adjudicacion.contents[5].find('a').get('href'))
+            #scrape_adjudicacion(adjudicacion.contents[5].find('a').get('href'))
     """
     mydf = open('dias.txt', 'a')
     VALORDIA = valor_d
@@ -383,7 +383,7 @@ def scrape_proveedor(data):
     cod = data[data.rfind('=')+1:]
     # reviso si ya tengo la info del proveedor de manera local
 
-    if os.path.isfile('proveedores/{}.html'.format(cod)):
+    if os.path.isfile('proveedores/html/{}.html'.format(cod)):
         logging.debug('La informacion del proveedor %s ya esta de manera local', cod)
 
     else:
@@ -398,7 +398,7 @@ def scrape_proveedor(data):
 
         contenido = response.content
         soup = BeautifulSoup(contenido, 'lxml')
-        mydf = open('proveedores/{}.html'.format(cod), 'a')
+        mydf = open('proveedores/html/{}.html'.format(cod), 'a')
         mydf.writelines(contenido)
         mydf.close()
 
@@ -407,11 +407,9 @@ def scrape_proveedor(data):
 # 12 de mayo de 2016 ese dia hay mas de 500 adj
 # lo que significa que se puede probar
 # el algoritmo para paginacion con esos datos
-startTime = datetime.datetime.now()
-start = time.time()
-scrape_month(2016, '11')
+
+#scrape_month(2016, '11')
 #scrape_adjudicacion('nog=5230837&o=9')
-print('It took {0:0.1f} seconds'.format(time.time() - start))
 
 #print elht
 #get_prov_adj(elht, 20)
