@@ -6,6 +6,6 @@ import time
 
 
 start = time.time()
-walker.scrape_month(2016, '08')
+walker.scrape_month(2016, '12')
 
 print('It took {0:0.1f} seconds'.format(time.time() - start))

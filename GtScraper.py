@@ -141,8 +141,11 @@ def scrape_month(year, month):
     #creo el calendario para iterar sobre las fechas requeridas
     lista_dias = CALENDARIO.itermonthdates(year, int(month))
 
+    
+    
     #scrape_day(27,9,2016,tokens)
     #scrape_day(1,11,2016,tokens)
+    #scrape_day(1, 1, 16, tokens)
     #return
     for mi_dia in lista_dias:
         el_mes = str(mi_dia)[5:7]
@@ -208,7 +211,7 @@ def scrape_day(day, month, year, tokens):
     tabla = soup.findAll('tr', attrs={'class': re.compile('TablaFilaMix.')})
     for adjudicacion in tabla:
         scrape_proveedor(adjudicacion.contents[2].find('a').get('href'))
-        #scrape_adjudicacion(adjudicacion.contents[5].find('a').get('href'))
+        scrape_adjudicacion(adjudicacion.contents[5].find('a').get('href'))
         #scrape_adjudicacion()
         # link hacia la adj -> elem.contents[5].find('a').get('href')
         # nombre del proveedor -> elem.contents[2].find('a').string
@@ -279,7 +282,10 @@ def scrape_day(day, month, year, tokens):
         tabla = soup.findAll('tr', attrs={'class': re.compile('TablaFilaMix.')})
         for adjudicacion in tabla:
             scrape_proveedor(adjudicacion.contents[2].find('a').get('href'))
-            #scrape_adjudicacion(adjudicacion.contents[5].find('a').get('href'))
+            scrape_adjudicacion(adjudicacion.contents[5].find('a').get('href'))
+    
+    logging.info('ya obtuve las adjudicaciones del dia')
+    
     """
     mydf = open('dias.txt', 'a')
     VALORDIA = valor_d
@@ -373,10 +379,38 @@ def scrape_adjudicacion(data):
     if response.status_code != OK_CODE:
         logging.error('Request fallida, codigo de respuesta: %s', response.status_code)
         raise ValueError('error la pagina de la adjudicacion %s', data)
-
+    val = len(response.content)
     contenido = response.content
+    contenido = contenido.replace('&#9660', '&#033')
     soup = BeautifulSoup(contenido, 'lxml')
-    #print soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_txtTitulo'})
+    print soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_txtTitulo'})
+
+def scrape_comprador(data):
+    """
+    funcion que recibe el link hacia el comprador
+    y luego guarda el objeto
+    """
+    cod = data[data.rfind('=')+1:]
+    # reviso si ya tengo la info del comprador de manera local
+
+    if os.path.isfile('compradores/html/{}.html'.format(cod)):
+        logging.debug('La informacion del comprador %s ya esta de manera local', cod)
+
+    else:
+        logging.debug('Se va a pedir al server la info del comprador %s', cod)
+
+        req = requests.Request('GET', '{}{}'.format(BASE_URL, data), headers=HEADERS)
+        prepped = SESSION.prepare_request(req)
+        response = SESSION.send(prepped)
+        if response.status_code != OK_CODE:
+            logging.error('Request fallida, codigo de respuesta: %s', response.status_code)
+            raise ValueError('error la pagina de la adjudicacion %s', data)
+
+        contenido = response.content
+        soup = BeautifulSoup(contenido, 'lxml')
+        mydf = open('compradores/html/{}.html'.format(cod), 'w')
+        mydf.writelines(contenido)
+        mydf.close()
 
 def scrape_proveedor(data):
 
@@ -398,7 +432,7 @@ def scrape_proveedor(data):
 
         contenido = response.content
         soup = BeautifulSoup(contenido, 'lxml')
-        mydf = open('proveedores/html/{}.html'.format(cod), 'a')
+        mydf = open('proveedores/html/{}.html'.format(cod), 'w')
         mydf.writelines(contenido)
         mydf.close()
 
@@ -408,7 +442,7 @@ def scrape_proveedor(data):
 # lo que significa que se puede probar
 # el algoritmo para paginacion con esos datos
 
-#scrape_month(2016, '11')
+scrape_month(2016, '01')
 #scrape_adjudicacion('nog=5230837&o=9')
 
 #print elht
