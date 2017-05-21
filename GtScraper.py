@@ -6,7 +6,6 @@ and then it asks the user, which year they want to scrape
 """
 import calendar
 import datetime
-import json
 import logging
 import os.path
 import re
@@ -36,6 +35,9 @@ MESES = ['enero',
          'noviembre',
          'diciembre']
 OK_CODE = 200
+# este numero de abajo es cuantos segundo se van a esperar entre request para que el servidor
+# no evite nuestras conexiones, se usa en el proceso de ScrapeDay
+FACTOR_ESPERA = 4
 HEADERS = requests.utils.default_headers()
 HEADERS.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0'})
 POST_PARAMS = {'MasterGC$ContentBlockHolder$ScriptManager1': '',
@@ -99,10 +101,10 @@ def scrape_month(year, month):
     #se manda este primer request para obtener los tokens que el servidor
     #necesita para enviar el resto de la info de manera correcta
     #ver pag1.html
+    logging.info('Voy a hacer el GET de la main URL (pag1.html) para el mes %s/%s', month, year)
     req = requests.Request('GET', MAIN_URL, headers=HEADERS)
     prepped = SESSION.prepare_request(req)
     response = SESSION.send(prepped)
-    logging.info('Voy a hacer el GET de la main URL (pag1.html) para el mes %s/%s', month, year)
     if response.status_code != OK_CODE:
         logging.error('La request de la main URL fallida, error %s', response.status_code)
         return
@@ -141,8 +143,7 @@ def scrape_month(year, month):
     #creo el calendario para iterar sobre las fechas requeridas
     lista_dias = CALENDARIO.itermonthdates(year, int(month))
 
-    
-    
+
     #scrape_day(27,9,2016,tokens)
     #scrape_day(1,11,2016,tokens)
     #scrape_day(1, 1, 16, tokens)
@@ -210,14 +211,14 @@ def scrape_day(day, month, year, tokens):
     # hay que obtener la info de la primera pagina
     tabla = soup.findAll('tr', attrs={'class': re.compile('TablaFilaMix.')})
     for adjudicacion in tabla:
-        scrape_proveedor(adjudicacion.contents[2].find('a').get('href'))
+        #scrape_proveedor(adjudicacion.contents[2].find('a').get('href'))
         scrape_adjudicacion(adjudicacion.contents[5].find('a').get('href'))
+        time.sleep(FACTOR_ESPERA)
         #scrape_adjudicacion()
         # link hacia la adj -> elem.contents[5].find('a').get('href')
         # nombre del proveedor -> elem.contents[2].find('a').string
         # NIT del proveedor -> elem.contents[3].string
         #print elem.contents[5].find('a').get('href'), elem.contents[2].find('a').string, elem.contents[3].string
-
 
 
     del my_params['MasterGC$ContentBlockHolder$Button1']
@@ -230,7 +231,9 @@ def scrape_day(day, month, year, tokens):
     offset = num_pags%10
     band = offset > 1
 
+    # se arma el numero de pag que se necesita pedir
     for pag_actual in range(2, num_pags+1):
+        # las primeras paginas si se piden con su numero al servidor
         if pag_actual < 12:
             if pag_actual < 10:
                 my_params['MasterGC$ContentBlockHolder$ScriptManager1'] = 'MasterGC$ContentBlockHolder$UpdatePanel2|MasterGC$ContentBlockHolder$dgResultado$ctl54$ctl0{}'.format(pag_actual)
@@ -240,6 +243,8 @@ def scrape_day(day, month, year, tokens):
                 my_params['__EVENTTARGET'] = 'MasterGC$ContentBlockHolder$dgResultado$ctl54$ctl{}'.format(pag_actual)
         else:
             la_pag = pag_actual
+            # a partir de la 13va pagina el numero de pagina se vuelve relativo y se calcula
+            # con la expresion de abajo
             if band:
                 la_pag = la_pag - offset + 1
 
@@ -281,8 +286,9 @@ def scrape_day(day, month, year, tokens):
         # ahora toca la parte de procesar la info que tienen las adjudicaciones
         tabla = soup.findAll('tr', attrs={'class': re.compile('TablaFilaMix.')})
         for adjudicacion in tabla:
-            scrape_proveedor(adjudicacion.contents[2].find('a').get('href'))
+            #scrape_proveedor(adjudicacion.contents[2].find('a').get('href'))
             scrape_adjudicacion(adjudicacion.contents[5].find('a').get('href'))
+            time.sleep(FACTOR_ESPERA)
     
     logging.info('ya obtuve las adjudicaciones del dia')
     
@@ -383,28 +389,31 @@ def scrape_adjudicacion(data):
     contenido = response.content
     contenido = contenido.replace('&#9660', '&#033')
     soup = BeautifulSoup(contenido, 'lxml')
-    print soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_txtTitulo'})
+    comprador = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_txtEntidad'})
+    print comprador.find('a').get('href')
+    scrape_comprador(comprador.find('a').get('href'))
+    #print soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_txtTitulo'})
 
-def scrape_comprador(data):
+def scrape_comprador(url):
     """
     funcion que recibe el link hacia el comprador
     y luego guarda el objeto
     """
-    cod = data[data.rfind('=')+1:]
+    cod = url[url.find('=')+1:url.find('&')]
+    logging.info('obteniendo la info del comprador %s')
     # reviso si ya tengo la info del comprador de manera local
-
     if os.path.isfile('compradores/html/{}.html'.format(cod)):
         logging.debug('La informacion del comprador %s ya esta de manera local', cod)
 
     else:
         logging.debug('Se va a pedir al server la info del comprador %s', cod)
 
-        req = requests.Request('GET', '{}{}'.format(BASE_URL, data), headers=HEADERS)
+        req = requests.Request('GET', '{}{}'.format(BASE_URL, url), headers=HEADERS)
         prepped = SESSION.prepare_request(req)
         response = SESSION.send(prepped)
         if response.status_code != OK_CODE:
             logging.error('Request fallida, codigo de respuesta: %s', response.status_code)
-            raise ValueError('error la pagina de la adjudicacion %s', data)
+            raise ValueError('error la pagina de la adjudicacion %s', url)
 
         contenido = response.content
         soup = BeautifulSoup(contenido, 'lxml')
@@ -412,23 +421,25 @@ def scrape_comprador(data):
         mydf.writelines(contenido)
         mydf.close()
 
-def scrape_proveedor(data):
+def scrape_proveedor(url):
 
-    cod = data[data.rfind('=')+1:]
+    cod = url[url.rfind('=')+1:]
+
+    logging.info('voy a pedir la info del proveedor %s', cod)
+    
     # reviso si ya tengo la info del proveedor de manera local
-
     if os.path.isfile('proveedores/html/{}.html'.format(cod)):
         logging.debug('La informacion del proveedor %s ya esta de manera local', cod)
 
     else:
         logging.debug('Se va a pedir al server la info del proveedor %s', cod)
 
-        req = requests.Request('GET', '{}{}'.format(BASE_URL, data), headers=HEADERS)
+        req = requests.Request('GET', '{}{}'.format(BASE_URL, url), headers=HEADERS)
         prepped = SESSION.prepare_request(req)
         response = SESSION.send(prepped)
         if response.status_code != OK_CODE:
             logging.error('Request fallida, codigo de respuesta: %s', response.status_code)
-            raise ValueError('error la pagina de la adjudicacion %s', data)
+            raise ValueError('error la pagina de la adjudicacion %s', url)
 
         contenido = response.content
         soup = BeautifulSoup(contenido, 'lxml')
@@ -436,7 +447,7 @@ def scrape_proveedor(data):
         mydf.writelines(contenido)
         mydf.close()
 
-    
+
 
 # 12 de mayo de 2016 ese dia hay mas de 500 adj
 # lo que significa que se puede probar
