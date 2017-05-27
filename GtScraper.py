@@ -511,7 +511,7 @@ def gen_csv_prov():
                 row += base.next_sibling.next_sibling.next_sibling.next_sibling.contents[1].string + ','
             # representante legal, se quita la ',,' entre nombres y apellidos
             if soup.find('a', attrs={'id': 'MasterGC_ContentBlockHolder_gvRepresentantesLegales_ctl02_proveedor'}) is None:
-                row += ','
+                pass
             else:
                 rep_legal = soup.find('a', attrs={'id': 'MasterGC_ContentBlockHolder_gvRepresentantesLegales_ctl02_proveedor'}).next_sibling.string
                 rep_legal = rep_legal.strip().replace(',,', ',', 1).replace(',', ' ')
