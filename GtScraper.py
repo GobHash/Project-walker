@@ -5,9 +5,10 @@ it starts at this page (http://guatecompras.gt/proveedores/consultaadvprovee.asp
 and then it asks the user, which year they want to scrape
 """
 import calendar
+import csv
 import datetime
 import logging
-import os.path
+import os
 import re
 import time
 from math import ceil
@@ -37,7 +38,9 @@ MESES = ['enero',
 OK_CODE = 200
 # este numero de abajo es cuantos segundo se van a esperar entre request para que el servidor
 # no evite nuestras conexiones, se usa en el proceso de ScrapeDay
-FACTOR_ESPERA = 4
+FACTOR_ESPERA = 1
+#como su nombre lo indica, espera esa cantidad de segundos la respuesta del server antes de botar la conexion 
+TIMEOUT = 15
 HEADERS = requests.utils.default_headers()
 HEADERS.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0'})
 POST_PARAMS = {'MasterGC$ContentBlockHolder$ScriptManager1': '',
@@ -95,16 +98,16 @@ def scrape_month(year, month):
     """
     metodo encargado de iterar sobre el mes recibido en los params
     :param year: año para obtener.
-    :param mont: el mes en especifico que se quiere obtener.
+    :param month: el mes en especifico que se quiere obtener.
     """
     #comienzo obteniendo la info de la pag base desde donde voy a buscar
     #se manda este primer request para obtener los tokens que el servidor
     #necesita para enviar el resto de la info de manera correcta
     #ver pag1.html
-    logging.info('Voy a hacer el GET de la main URL (pag1.html) para el mes %s/%s', month, year)
+    logging.info('Voy a hacer el GET de la main URL (pag1.html) para el  %s/%s', month, year)
     req = requests.Request('GET', MAIN_URL, headers=HEADERS)
     prepped = SESSION.prepare_request(req)
-    response = SESSION.send(prepped)
+    response = SESSION.send(prepped, timeout=TIMEOUT)
     if response.status_code != OK_CODE:
         logging.error('La request de la main URL fallida, error %s', response.status_code)
         return
@@ -127,10 +130,10 @@ def scrape_month(year, month):
     logging.debug('Voy a hacer el request del primer POST del mes %s', month)
     req = requests.Request('POST', MAIN_URL, headers=HEADERS, data=my_params)
     prepped = SESSION.prepare_request(req)
-    response = SESSION.send(prepped)
+    response = SESSION.send(prepped, timeout=TIMEOUT)
 
     if response.status_code != OK_CODE:
-        logging.error('La request del primer POST recibe el codigo %s, del server', response.status_code)
+        logging.error('error al iniciar, recibe el codigo %s, del server', response.status_code)
         return
     logging.debug('Ya tengo tengo el response (pag2.html) completado exitosamente')
     #es en este response en que ya estoy en un punto similar al de pag2.html
@@ -160,16 +163,20 @@ def scrape_month(year, month):
 def scrape_day(day, month, year, tokens):
     """
     metodo que se encargar de obtener la información de determinado día del mes
+    :param day: el dia que se quiere obtener. ej: 22
+    :param month: el mes en especifico que se quiere obtener. ej: 5
+    :param year: año para obtener. ej: 2016
+    :param tokens: el viewstate y otros elementos requeridos, es un array
     """
     logging.info('voy a obtener la info para el %s/%s/%s', day, month, year)
 
     my_params = POST_PARAMS.copy()
     #vuelvo a actualizar los tokens que necesita el server
-    #el uno(1) de abajo es porque buscamos proveedores con NIT
     my_params['MasterGC$ContentBlockHolder$txtFechaIni'] = '{}.{}.{}'.format(day, month, year)
     my_params['MasterGC$ContentBlockHolder$txtFechaFin'] = '{}.{}.{}'.format(day, month, year)
     my_params['MasterGC$ContentBlockHolder$txtMontoIni'] = ''
     my_params['MasterGC$ContentBlockHolder$txtMontoFin'] = ''
+    #el uno(1) de abajo es porque buscamos proveedores con NIT
     my_params['MasterGC$ContentBlockHolder$ddlTipoProv'] = '1'
     my_params['MasterGC$ContentBlockHolder$Button1'] = 'Consultar'
     my_params['__VIEWSTATE'] = tokens[0]
@@ -177,8 +184,8 @@ def scrape_day(day, month, year, tokens):
     my_params['__EVENTVALIDATION'] = tokens[2]
     req = requests.Request('POST', MAIN_URL, headers=HEADERS, data=my_params)
     prepped = SESSION.prepare_request(req)
-    response = SESSION.send(prepped)
-
+    response = SESSION.send(prepped, timeout=TIMEOUT)
+    
     #mydf = open('main3.html', 'w')
     #mydf.writelines(response.content)
     #mydf.close()
@@ -261,7 +268,7 @@ def scrape_day(day, month, year, tokens):
         # pido la pag que necesito
         req = requests.Request('POST', MAIN_URL, headers=HEADERS, data=my_params)
         prepped = SESSION.prepare_request(req)
-        response = SESSION.send(prepped)
+        response = SESSION.send(prepped, timeout=TIMEOUT)
 
         if response.status_code != OK_CODE:
             logging.error('Request fallida, codigo de respuesta: %s', response.status_code)
@@ -306,6 +313,8 @@ def obtain_tokens(contenido):
     """
     metodo encargado de sacar los tokens que vienen
     en la respuesta del servidor
+    :param contenido: es el html de la pag de la cual se quieren obtener los tokens
+    :rtype list: la lista que tiene los tokens encontrados
     """
     #en el responde de la pag estos son los campos que delimitan la info que sirve
     mark1 = contenido.index('|0|hiddenField|__EVENTTARGET|')
@@ -374,17 +383,17 @@ def get_prov_adj(html, year):
     for row in tabla.findAll('tr', attrs={'class': 'TablaFila2'}):
         print row
     """
-def scrape_adjudicacion(data):
+def scrape_adjudicacion(url):
     """
     metodo que recibe el numero de adjudicacion y se encarga de obtener
     la informacion que hay en su pagina
     """
-    req = requests.Request('GET', '{}{}'.format(BASE_URL, data), headers=HEADERS)
+    req = requests.Request('GET', '{}{}'.format(BASE_URL, url), headers=HEADERS)
     prepped = SESSION.prepare_request(req)
-    response = SESSION.send(prepped)
+    response = SESSION.send(prepped, timeout=TIMEOUT)
     if response.status_code != OK_CODE:
         logging.error('Request fallida, codigo de respuesta: %s', response.status_code)
-        raise ValueError('error la pagina de la adjudicacion %s', data)
+        raise ValueError('error la pagina de la adjudicacion %s', url)
     val = len(response.content)
     contenido = response.content
     contenido = contenido.replace('&#9660', '&#033')
@@ -410,7 +419,7 @@ def scrape_comprador(url):
 
         req = requests.Request('GET', '{}{}'.format(BASE_URL, url), headers=HEADERS)
         prepped = SESSION.prepare_request(req)
-        response = SESSION.send(prepped)
+        response = SESSION.send(prepped, timeout=TIMEOUT)
         if response.status_code != OK_CODE:
             logging.error('Request fallida, codigo de respuesta: %s', response.status_code)
             raise ValueError('error la pagina de la adjudicacion %s', url)
@@ -422,7 +431,11 @@ def scrape_comprador(url):
         mydf.close()
 
 def scrape_proveedor(url):
-
+    """
+    funcion que obtiene los datos del proveedor y los agrega
+    al CSV correspondiente
+    :param url: link hacia el proveedor
+    """
     cod = url[url.rfind('=')+1:]
 
     logging.info('voy a pedir la info del proveedor %s', cod)
@@ -436,7 +449,7 @@ def scrape_proveedor(url):
 
         req = requests.Request('GET', '{}{}'.format(BASE_URL, url), headers=HEADERS)
         prepped = SESSION.prepare_request(req)
-        response = SESSION.send(prepped)
+        response = SESSION.send(prepped, timeout=TIMEOUT)
         if response.status_code != OK_CODE:
             logging.error('Request fallida, codigo de respuesta: %s', response.status_code)
             raise ValueError('error la pagina de la adjudicacion %s', url)
@@ -449,11 +462,76 @@ def scrape_proveedor(url):
 
 
 
+
+def gen_csv_prov():
+    """
+    genera el csv de los proveedores
+    """
+    provs = []
+    campos = 'nit,tipo,nombre,fechaConstitucion,inscripcionRM,representanteLegal'
+    provs.append(campos)
+    for proveedor in os.listdir('proveedores/html/'):
+        row = ''
+        print proveedor
+        #proveedor = '1256716.html'
+        #proveedor = '1030082.html'
+        #proveedor = '11.html'
+        #proveedor = '530841.html'
+        #proveedor = '57573.html'
+        mydf = open('proveedores/html/{}'.format(proveedor), 'r')
+        contenido = mydf.read()
+        soup = BeautifulSoup(contenido, 'lxml')
+        row += soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_lblNIT'}).string + ','
+        
+        base = soup.find('div', attrs={'id': 'MasterGC_ContentBlockHolder_pnl_DatosInscripcion2'}).find('tr')
+        # tipo
+        tipo = base.contents[1].string
+        row += tipo + ','
+        # nombre
+        row += soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_lblNombreProv'}).string.replace(',,', ',', 1).replace(',', ' ') + ','
+        if 'INDIVIDUAL' in tipo:
+            # no hay
+            # fecha de constitucion, repLegal, inscripcionRM
+            row += ',,'
+        else:
+            base = soup.find('div', attrs={'id': 'MasterGC_ContentBlockHolder_pnl_DatosInscripcion2'}).find('tr')
+            #print len(base.parent.find_all('tr'))
+            # fecha de constitucion
+            # entra a este caso no no hay fecha de constitucion (ver 11.html)
+            if len(base.parent.find_all('tr')) < 3:
+                row += ','
+            else:
+                row += base.next_sibling.next_sibling.contents[1].string + ','
+            # fecha de inscripcion Registro Mercantil
+            #cuando se cumple esta condicion, la empresa solo es provisional (ver 1030082.html)
+            if len(base.parent.find_all('tr')) < 5:
+                row += base.next_sibling.contents[1].string + ','
+                #print '--'
+            else:
+                row += base.next_sibling.next_sibling.next_sibling.next_sibling.contents[1].string + ','
+            # representante legal, se quita la ',,' entre nombres y apellidos
+            if soup.find('a', attrs={'id': 'MasterGC_ContentBlockHolder_gvRepresentantesLegales_ctl02_proveedor'}) is None:
+                row += ','
+            else:
+                rep_legal = soup.find('a', attrs={'id': 'MasterGC_ContentBlockHolder_gvRepresentantesLegales_ctl02_proveedor'}).next_sibling.string
+                rep_legal = rep_legal.strip().replace(',,', ',', 1).replace(',', ' ')
+                row += rep_legal
+            #print '--'
+        #break
+        provs.append(row.encode('utf-8'))
+        #break
+        #print len(soup.find('table', attrs={'class': 'TablaForm3'}).contents)
+        #print soup.find('table', attrs={'class': 'TablaForm3'}).table.find('td', attrs={'class': 'EtiquetaForm2'}).next_sibling.next_sibling
+    
+    with open('proveedores/object/proveedores.csv', 'w') as csvfile:
+        for pr in provs:
+            csvfile.write(pr+'\n')
+    #soup = BeautifulSoup(contenido, 'lxml')
 # 12 de mayo de 2016 ese dia hay mas de 500 adj
 # lo que significa que se puede probar
 # el algoritmo para paginacion con esos datos
-
-scrape_month(2016, '01')
+gen_csv_prov()
+#scrape_month(2016, '01')
 #scrape_adjudicacion('nog=5230837&o=9')
 
 #print elht
