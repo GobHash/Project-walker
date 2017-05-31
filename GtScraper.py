@@ -5,7 +5,6 @@ it starts at this page (http://guatecompras.gt/proveedores/consultaadvprovee.asp
 and then it asks the user, which year they want to scrape
 """
 import calendar
-import csv
 import datetime
 import logging
 import os
@@ -15,6 +14,8 @@ from math import ceil
 
 import requests
 from bs4 import BeautifulSoup
+
+import load_assets
 
 logging.basicConfig(filename='activity.log', level=logging.DEBUG)
 CALENDARIO = calendar.Calendar()
@@ -37,12 +38,13 @@ MESES = ['enero',
          'diciembre']
 OK_CODE = 200
 # este numero de abajo es cuantos segundo se van a esperar entre request para que el servidor
-# no evite nuestras conexiones, se usa en el proceso de ScrapeDay
-FACTOR_ESPERA = 1
-#como su nombre lo indica, espera esa cantidad de segundos la respuesta del server antes de botar la conexion 
-TIMEOUT = 15
+
+FACTOR_ESPERA = 5 # segundos de espera antes de enviar el siguiente request, ver scrapeDay
+
+TIMEOUT = 60 # segundos de espera antes de botar conexion con el server
 HEADERS = requests.utils.default_headers()
 HEADERS.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0'})
+HEADERS.update({'User-Agent': 'Mozilla/5.0 (iPad; CPU OS 10_3_1 like Mac OS X) AppleWebKit/603.1.30 (KHTML, like Gecko) Version/10.0 Mobile/14E304 Safari/602.1'})
 POST_PARAMS = {'MasterGC$ContentBlockHolder$ScriptManager1': '',
                'MasterGC$ContentBlockHolder$rdbOpciones': '',
                '__EVENTTARGET': '',
@@ -53,6 +55,20 @@ POST_PARAMS = {'MasterGC$ContentBlockHolder$ScriptManager1': '',
                '__EVENTVALIDATION': '',
                '__ASYNCPOST': 'true'}
 
+CSV_ADJ = 'adjudicaciones/adj_csv.csv'
+#estas lineas son para la carga de datos en masa
+#para la version de carga diaria no se va a guardar info de manera local
+#PROVEEDORES_LIST = load_assets.load_proveedores()
+COMPRADORES_LIST = load_assets.load_compradores()
+ADJUDICACIONES_DIARIAS = []
+CAMPOS_ADJUDICACIONES = ['nit_comprador',
+                         'nit_proveedor',
+                         'monto',
+                         'unidades',
+                         'fecha_adjudicada',
+                         'fecha_publicada',
+                         'modalidad_compra',
+                         'categoria']
 #esto sirve para que las cookies sean persistentes entre requests
 SESSION = requests.Session()
 
@@ -100,6 +116,8 @@ def scrape_month(year, month):
     :param year: año para obtener.
     :param month: el mes en especifico que se quiere obtener.
     """
+    global ADJUDICACIONES_DIARIAS
+    global CAMPOS_ADJUDICACIONES
     #comienzo obteniendo la info de la pag base desde donde voy a buscar
     #se manda este primer request para obtener los tokens que el servidor
     #necesita para enviar el resto de la info de manera correcta
@@ -151,12 +169,58 @@ def scrape_month(year, month):
     #scrape_day(1,11,2016,tokens)
     #scrape_day(1, 1, 16, tokens)
     #return
+    #
+    mydf = open('ultimo_exito.txt', 'r')
+    ultimo_exito = mydf.read().split(',')
+    mydf.close()
+    hay_min = False
+    print ultimo_exito
+    print 'ld'
+    if len(ultimo_exito) > 1:
+        min_dia = int(ultimo_exito[0])
+        min_mes = int(ultimo_exito[1])
+        min_year = int(ultimo_exito[2])
+        hay_min = True
     for mi_dia in lista_dias:
         el_mes = str(mi_dia)[5:7]
         if el_mes == month:
             print mi_dia
-            #tokens = scrape_day(str(mi_dia)[8:], month, year, tokens)
-            scrape_day(str(mi_dia)[8:], month, year, tokens)
+            if hay_min:
+                if int(year) >= min_year:
+                    if int(month) >= min_mes:
+                        if int(str(mi_dia)[8:]) > min_dia:
+                            start2 = time.time()
+                            scrape_day(str(mi_dia)[8:], month, year, tokens)
+                            print 'It took {0:0.1f} seconds'.format(time.time() - start2)
+                            load_assets.gen_csv(ADJUDICACIONES_DIARIAS, CAMPOS_ADJUDICACIONES, 'adjudicaciones/adjudicaciones.csv')
+                            logging.info('agregadas al csv las adjs')
+                            ADJUDICACIONES_DIARIAS = []
+                            min_dia = int(str(mi_dia)[8:])
+                            min_mes = int(month)
+                            min_year = int(year)
+                            mydf = open('ultimo_exito.txt', 'w')
+                            min_date = '{},{},{}'.format(min_dia, min_mes, min_year)
+                            mydf.write(min_date)
+                            mydf.close()
+                            logging.info('actualizado el archivo de fechas')
+            else:
+                start2 = time.time()
+                scrape_day(str(mi_dia)[8:], month, year, tokens)
+                print 'It took {0:0.1f} seconds'.format(time.time() - start2)
+                load_assets.gen_csv(ADJUDICACIONES_DIARIAS, CAMPOS_ADJUDICACIONES, 'adjudicaciones/adjudicaciones.csv')
+                logging.info('agregadas al csv las adjs')
+                ADJUDICACIONES_DIARIAS = []
+                min_dia = int(str(mi_dia)[8:])
+                min_mes = int(month)
+                min_year = int(year)
+                hay_min = True
+                mydf = open('ultimo_exito.txt', 'w')
+                min_date = '{},{},{}'.format(min_dia, min_mes, min_year)
+                mydf.write(min_date)
+                mydf.close()
+                logging.info('actualizado el archivo de fechas')
+        #if i > 7:
+            #break
 
 
 
@@ -185,10 +249,6 @@ def scrape_day(day, month, year, tokens):
     req = requests.Request('POST', MAIN_URL, headers=HEADERS, data=my_params)
     prepped = SESSION.prepare_request(req)
     response = SESSION.send(prepped, timeout=TIMEOUT)
-    
-    #mydf = open('main3.html', 'w')
-    #mydf.writelines(response.content)
-    #mydf.close()
 
     if response.status_code != OK_CODE:
         logging.error('Request fallida, codigo de respuesta: %s', response.status_code)
@@ -215,6 +275,9 @@ def scrape_day(day, month, year, tokens):
 
     logging.info('Para este dia hay %s adjudicaciones', total_dia)
 
+    adjudicaciones_hoy = []
+    proveedores_hoy = []
+    compradores_hoy = []
     # hay que obtener la info de la primera pagina
     tabla = soup.findAll('tr', attrs={'class': re.compile('TablaFilaMix.')})
     for adjudicacion in tabla:
@@ -274,11 +337,6 @@ def scrape_day(day, month, year, tokens):
             logging.error('Request fallida, codigo de respuesta: %s', response.status_code)
             raise ValueError('error al obtener la info del dia %s/%s/%s', day, month, year)
 
-        #mydf = open('subPag_{}.html'.format(pag_actual), 'w')
-        #contenido = response.content
-        #mydf.writelines(contenido)
-        #mydf.close()
-
 
         logging.debug('obtenida la pag %s de %s', pag_actual, num_pags)
 
@@ -296,9 +354,9 @@ def scrape_day(day, month, year, tokens):
             #scrape_proveedor(adjudicacion.contents[2].find('a').get('href'))
             scrape_adjudicacion(adjudicacion.contents[5].find('a').get('href'))
             time.sleep(FACTOR_ESPERA)
-    
+
     logging.info('ya obtuve las adjudicaciones del dia')
-    
+
     """
     mydf = open('dias.txt', 'a')
     VALORDIA = valor_d
@@ -388,29 +446,88 @@ def scrape_adjudicacion(url):
     metodo que recibe el numero de adjudicacion y se encarga de obtener
     la informacion que hay en su pagina
     """
+    print url
+    global COMPRADORES_LIST
+    global ADJUDICACIONES_DIARIAS
     req = requests.Request('GET', '{}{}'.format(BASE_URL, url), headers=HEADERS)
     prepped = SESSION.prepare_request(req)
     response = SESSION.send(prepped, timeout=TIMEOUT)
+    time.sleep(FACTOR_ESPERA/2.0)
     if response.status_code != OK_CODE:
         logging.error('Request fallida, codigo de respuesta: %s', response.status_code)
         raise ValueError('error la pagina de la adjudicacion %s', url)
-    val = len(response.content)
-    contenido = response.content
-    contenido = contenido.replace('&#9660', '&#033')
-    soup = BeautifulSoup(contenido, 'lxml')
-    comprador = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_txtEntidad'})
-    print comprador.find('a').get('href')
-    scrape_comprador(comprador.find('a').get('href'))
-    #print soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_txtTitulo'})
 
-def scrape_comprador(url):
+    contenido = response.content
+    """
+    mydf = open('adjudicaciones/adj1.html', 'r')
+    contenido = mydf.read()
+    mydf.close()
+    """
+    contenido = contenido.replace('&#9660', '&#033')
+
+    soup = BeautifulSoup(contenido, 'lxml')
+    adjudicacion = {'nit_comprador':'',
+                    'nit_proveedor':'',
+                    'monto':'',
+                    'unidades':'',
+                    'fecha_adjudicada':'',
+                    'fecha_publicada':'',
+                    'modalidad_compra':'',
+                    'categoria':''}
+
+    #lleno primera la infor del comprador
+    comprador = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_txtEntidad'})
+    name_comprador = comprador.string.encode('utf-8')
+    scrape_comprador(name_comprador, comprador.find('a').get('href'))
+    adjudicacion['nit_comprador'] = COMPRADORES_LIST[name_comprador]['nit']
+
+    tabla = soup.find('table', attrs={'id': 'MasterGC_ContentBlockHolder_dgProveedores'})
+    #nit proveedor
+    tag = tabla.find('tr', attrs={'class':'TablaFilaMix1'}).contents[1]
+    adjudicacion['nit_proveedor'] = tag.string.encode('utf-8')
+    # monto
+    tag = tabla.find('tr', attrs={'class':'TablaFilaMix1'}).contents[4]
+    adjudicacion['monto'] = tag.string.encode('utf-8')
+    # fecha publicada
+    tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_txtFechaPub'})
+    adjudicacion['fecha_publicada'] = tag.string.encode('utf-8')
+    # fecha finalizacion
+    tag = soup.find('tr', attrs={'id': 'MasterGC_ContentBlockHolder_TrFechaFinalizacion'}).contents[3].find('span')
+    adjudicacion['fecha_adjudicada'] = tag.string.encode('utf-8')
+    # modalidad de compra
+    tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_txtModalidad'})
+    adjudicacion['modalidad_compra'] = tag.string.encode('utf-8')
+    # categoria
+    tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_txtCategoria'})
+    if tag.string is None: # hay mas de una categoria
+        cat = ''
+        for i in range(len(tag.contents)):
+            if i%2 == 0:
+                cat += tag.contents[i].encode('utf-8') + '~'
+
+        adjudicacion['categoria'] = cat[:-1]
+    else:
+        adjudicacion['categoria'] = tag.string.encode('utf-8')
+
+    ADJUDICACIONES_DIARIAS.append(adjudicacion)
+
+def scrape_comprador(nombre, url):
     """
     funcion que recibe el link hacia el comprador
     y luego guarda el objeto
     """
+    global COMPRADORES_LIST
+
+    if nombre in COMPRADORES_LIST:
+        return
     cod = url[url.find('=')+1:url.find('&')]
     logging.info('obteniendo la info del comprador %s')
     # reviso si ya tengo la info del comprador de manera local
+
+    # Al parecer no basta con tener la info de manera local
+    # la info que tiene la adjudicacion del proveedor es el nombre
+
+
     if os.path.isfile('compradores/html/{}.html'.format(cod)):
         logging.debug('La informacion del comprador %s ya esta de manera local', cod)
 
@@ -420,15 +537,41 @@ def scrape_comprador(url):
         req = requests.Request('GET', '{}{}'.format(BASE_URL, url), headers=HEADERS)
         prepped = SESSION.prepare_request(req)
         response = SESSION.send(prepped, timeout=TIMEOUT)
+        time.sleep(FACTOR_ESPERA/2.0)
         if response.status_code != OK_CODE:
             logging.error('Request fallida, codigo de respuesta: %s', response.status_code)
             raise ValueError('error la pagina de la adjudicacion %s', url)
 
         contenido = response.content
-        soup = BeautifulSoup(contenido, 'lxml')
         mydf = open('compradores/html/{}.html'.format(cod), 'w')
         mydf.writelines(contenido)
         mydf.close()
+        # agregar a la lista
+        comprador_actual = {'nit':'',
+                            'tipo':'',
+                            'nombre':'',
+                            'origenFondos':'',
+                            'departamento':'',
+                            'municipio':''}
+        
+        soup = BeautifulSoup(contenido, 'lxml')
+        # NIT
+        comprador_actual['nit'] = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_Lbl_Nit'}).string.encode('utf-8')
+        # tipo, se usa el next sibling 2 veces por que es el salto en los tr que hay que hacer
+        comprador_actual['tipo'] = soup.find('tr', attrs={'id': 'MasterGC_ContentBlockHolder_trNit'}).next_sibling.next_sibling.contents[2].string.encode('utf-8')
+        # nombre
+        comprador_actual['nombre'] = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_lblEntidad'}).string.encode('utf-8')
+        # origen de fondos
+        if soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_LblEntidadSiaf'}) is not None:
+            comprador_actual['origenFondos'] = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_LblEntidadSiaf'}).string.encode('utf-8')
+        # departamento
+        comprador_actual['departamento'] = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_lblDepartamento'}).string.encode('utf-8')
+        #municipio
+        comprador_actual['municipio'] = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_lblMunicipio'}).string.encode('utf-8')
+
+        COMPRADORES_LIST[comprador_actual['nombre']] = comprador_actual['nombre']
+
+
 
 def scrape_proveedor(url):
     """
@@ -439,7 +582,7 @@ def scrape_proveedor(url):
     cod = url[url.rfind('=')+1:]
 
     logging.info('voy a pedir la info del proveedor %s', cod)
-    
+
     # reviso si ya tengo la info del proveedor de manera local
     if os.path.isfile('proveedores/html/{}.html'.format(cod)):
         logging.debug('La informacion del proveedor %s ya esta de manera local', cod)
@@ -461,79 +604,17 @@ def scrape_proveedor(url):
         mydf.close()
 
 
-
-
-def gen_csv_prov():
-    """
-    genera el csv de los proveedores
-    """
-    provs = []
-    campos = 'nit,tipo,nombre,fechaConstitucion,inscripcionRM,representanteLegal'
-    provs.append(campos)
-    for proveedor in os.listdir('proveedores/html/'):
-        row = ''
-        print proveedor
-        #proveedor = '1256716.html'
-        #proveedor = '1030082.html'
-        #proveedor = '11.html'
-        #proveedor = '530841.html'
-        #proveedor = '57573.html'
-        mydf = open('proveedores/html/{}'.format(proveedor), 'r')
-        contenido = mydf.read()
-        soup = BeautifulSoup(contenido, 'lxml')
-        row += soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_lblNIT'}).string + ','
-        
-        base = soup.find('div', attrs={'id': 'MasterGC_ContentBlockHolder_pnl_DatosInscripcion2'}).find('tr')
-        # tipo
-        tipo = base.contents[1].string
-        row += tipo + ','
-        # nombre
-        row += soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_lblNombreProv'}).string.replace(',,', ',', 1).replace(',', ' ') + ','
-        if 'INDIVIDUAL' in tipo:
-            # no hay
-            # fecha de constitucion, repLegal, inscripcionRM
-            row += ',,'
-        else:
-            base = soup.find('div', attrs={'id': 'MasterGC_ContentBlockHolder_pnl_DatosInscripcion2'}).find('tr')
-            #print len(base.parent.find_all('tr'))
-            # fecha de constitucion
-            # entra a este caso no no hay fecha de constitucion (ver 11.html)
-            if len(base.parent.find_all('tr')) < 3:
-                row += ','
-            else:
-                row += base.next_sibling.next_sibling.contents[1].string + ','
-            # fecha de inscripcion Registro Mercantil
-            #cuando se cumple esta condicion, la empresa solo es provisional (ver 1030082.html)
-            if len(base.parent.find_all('tr')) < 5:
-                row += base.next_sibling.contents[1].string + ','
-                #print '--'
-            else:
-                row += base.next_sibling.next_sibling.next_sibling.next_sibling.contents[1].string + ','
-            # representante legal, se quita la ',,' entre nombres y apellidos
-            if soup.find('a', attrs={'id': 'MasterGC_ContentBlockHolder_gvRepresentantesLegales_ctl02_proveedor'}) is None:
-                pass
-            else:
-                rep_legal = soup.find('a', attrs={'id': 'MasterGC_ContentBlockHolder_gvRepresentantesLegales_ctl02_proveedor'}).next_sibling.string
-                rep_legal = rep_legal.strip().replace(',,', ',', 1).replace(',', ' ')
-                row += rep_legal
-            #print '--'
-        #break
-        provs.append(row.encode('utf-8'))
-        #break
-        #print len(soup.find('table', attrs={'class': 'TablaForm3'}).contents)
-        #print soup.find('table', attrs={'class': 'TablaForm3'}).table.find('td', attrs={'class': 'EtiquetaForm2'}).next_sibling.next_sibling
-    
-    with open('proveedores/object/proveedores.csv', 'w') as csvfile:
-        for pr in provs:
-            csvfile.write(pr+'\n')
-    #soup = BeautifulSoup(contenido, 'lxml')
 # 12 de mayo de 2016 ese dia hay mas de 500 adj
 # lo que significa que se puede probar
 # el algoritmo para paginacion con esos datos
-gen_csv_prov()
+#start = time.time()
+#gen_csv_prov()
+#load_assets.gen_csv_comp()
+#scrape_month(2016, '02')
+#print 'It took {0:0.1f} seconds'.format(time.time() - start)
 #scrape_month(2016, '01')
 #scrape_adjudicacion('nog=5230837&o=9')
-
+#scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4409809&o=9')
 #print elht
 #get_prov_adj(elht, 20)
 #20/06/2016 - 551

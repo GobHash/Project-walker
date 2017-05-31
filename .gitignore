@@ -3,4 +3,5 @@
 dias.txt
 /proveedores/*
 /compradores/*
+/adjudicaciones/*
 *.pyc
