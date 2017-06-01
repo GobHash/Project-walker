@@ -41,7 +41,7 @@ OK_CODE = 200
 
 FACTOR_ESPERA = 3 # segundos de espera antes de enviar el siguiente request, ver scrapeDay
 
-TIMEOUT = 60 # segundos de espera antes de botar conexion con el server
+TIMEOUT = 180 # segundos de espera antes de botar conexion con el server
 HEADERS = requests.utils.default_headers()
 HEADERS.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0'})
 HEADERS.update({'User-Agent': 'Mozilla/5.0 (iPad; CPU OS 10_3_1 like Mac OS X) AppleWebKit/603.1.30 (KHTML, like Gecko) Version/10.0 Mobile/14E304 Safari/602.1'})
