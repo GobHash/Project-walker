@@ -569,7 +569,7 @@ def scrape_comprador(nombre, url):
         #municipio
         comprador_actual['municipio'] = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_lblMunicipio'}).string.encode('utf-8')
 
-        COMPRADORES_LIST[comprador_actual['nombre']] = comprador_actual['nombre']
+        COMPRADORES_LIST[comprador_actual['nombre']] = comprador_actual
 
 
 
