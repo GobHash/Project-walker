@@ -39,7 +39,7 @@ MESES = ['enero',
 OK_CODE = 200
 # este numero de abajo es cuantos segundo se van a esperar entre request para que el servidor
 
-FACTOR_ESPERA = 5 # segundos de espera antes de enviar el siguiente request, ver scrapeDay
+FACTOR_ESPERA = 3 # segundos de espera antes de enviar el siguiente request, ver scrapeDay
 
 TIMEOUT = 60 # segundos de espera antes de botar conexion con el server
 HEADERS = requests.utils.default_headers()
@@ -185,7 +185,7 @@ def scrape_month(year, month):
         el_mes = str(mi_dia)[5:7]
         if el_mes == month:
             print mi_dia
-            if hay_min:
+            if hay_min: # ya hay algun dia previo completado
                 if int(year) >= min_year:
                     if int(month) >= min_mes:
                         if int(str(mi_dia)[8:]) > min_dia:
@@ -203,7 +203,7 @@ def scrape_month(year, month):
                             mydf.write(min_date)
                             mydf.close()
                             logging.info('actualizado el archivo de fechas')
-            else:
+            else: # no hay algun dia previo completado
                 start2 = time.time()
                 scrape_day(str(mi_dia)[8:], month, year, tokens)
                 print 'It took {0:0.1f} seconds'.format(time.time() - start2)
@@ -446,6 +446,7 @@ def scrape_adjudicacion(url):
     metodo que recibe el numero de adjudicacion y se encarga de obtener
     la informacion que hay en su pagina
     """
+
     print url
     global COMPRADORES_LIST
     global ADJUDICACIONES_DIARIAS
@@ -488,6 +489,19 @@ def scrape_adjudicacion(url):
     # monto
     tag = tabla.find('tr', attrs={'class':'TablaFilaMix1'}).contents[4]
     adjudicacion['monto'] = tag.string.encode('utf-8')
+    # unidades
+    tag = soup.find('table', attrs={'id': 'MasterGC_ContentBlockHolder_DGTipoProducto'})
+    tabla = tag.findAll('tr', attrs={'class': re.compile('TablaFilaMix.')})
+    unidad = ''
+    for i in range(len(tabla)):
+        if i+3<10:
+            cant = tabla[i].find('span', attrs={'id': 'MasterGC_ContentBlockHolder_DGTipoProducto_ctl0{}_lblcant'.format(i+3)})
+        else:
+            cant = tabla[i].find('span', attrs={'id': 'MasterGC_ContentBlockHolder_DGTipoProducto_ctl{}_lblcant'.format(i+3)})
+        if cant is not None:
+            unidad += cant.string.encode('utf-8') + '~'
+    if unidad != '':
+        adjudicacion['unidades'] = unidad[:-1]
     # fecha publicada
     tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_txtFechaPub'})
     adjudicacion['fecha_publicada'] = tag.string.encode('utf-8')
@@ -508,7 +522,7 @@ def scrape_adjudicacion(url):
         adjudicacion['categoria'] = cat[:-1]
     else:
         adjudicacion['categoria'] = tag.string.encode('utf-8')
-
+    #print adjudicacion
     ADJUDICACIONES_DIARIAS.append(adjudicacion)
 
 def scrape_comprador(nombre, url):
