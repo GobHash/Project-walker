@@ -122,6 +122,7 @@ def scrape_month(year, month):
     #se manda este primer request para obtener los tokens que el servidor
     #necesita para enviar el resto de la info de manera correcta
     #ver pag1.html
+
     logging.info('Voy a hacer el GET de la main URL (pag1.html) para el  %s/%s', month, year)
     req = requests.Request('GET', MAIN_URL, headers=HEADERS)
     prepped = SESSION.prepare_request(req)
@@ -161,21 +162,13 @@ def scrape_month(year, month):
     tokens = obtain_tokens(contenido)
     logging.debug('ya fueron actualizados los tokens para el siguiente request(POST) del mes %s', month)
 
-    #creo el calendario para iterar sobre las fechas requeridas
     lista_dias = CALENDARIO.itermonthdates(year, int(month))
-
-
-    #scrape_day(27,9,2016,tokens)
-    #scrape_day(1,11,2016,tokens)
-    #scrape_day(1, 1, 16, tokens)
-    #return
-    #
-    mydf = open('ultimo_exito.txt', 'r')
-    ultimo_exito = mydf.read().split(',')
-    mydf.close()
+    ultimo_exito = []
+    with open('ultimo_exito.txt', 'r') as mydf:
+        ultimo_exito = mydf.read().split(',')
     hay_min = False
+    obtain_info = False
     print ultimo_exito
-    print 'ld'
     if len(ultimo_exito) > 1:
         min_dia = int(ultimo_exito[0])
         min_mes = int(ultimo_exito[1])
@@ -183,45 +176,41 @@ def scrape_month(year, month):
         hay_min = True
     for mi_dia in lista_dias:
         el_mes = str(mi_dia)[5:7]
-        if el_mes == month:
+        if el_mes == month: # hay dias que no son del mes actual, por el funcionamiento de las fechas en python
             print mi_dia
             if hay_min: # ya hay algun dia previo completado
-                if int(year) >= min_year:
-                    if int(month) >= min_mes:
-                        if int(str(mi_dia)[8:]) > min_dia:
-                            start2 = time.time()
-                            scrape_day(str(mi_dia)[8:], month, year, tokens)
-                            print 'It took {0:0.1f} seconds'.format(time.time() - start2)
-                            load_assets.gen_csv(ADJUDICACIONES_DIARIAS, CAMPOS_ADJUDICACIONES, 'adjudicaciones/adjudicaciones.csv')
-                            logging.info('agregadas al csv las adjs')
-                            ADJUDICACIONES_DIARIAS = []
-                            min_dia = int(str(mi_dia)[8:])
-                            min_mes = int(month)
-                            min_year = int(year)
-                            mydf = open('ultimo_exito.txt', 'w')
-                            min_date = '{},{},{}'.format(min_dia, min_mes, min_year)
-                            mydf.write(min_date)
-                            mydf.close()
-                            logging.info('actualizado el archivo de fechas')
+                if int(year) < min_year: #si el anio es mayor se sacan datos, de lo contrario se 
+                    print 'la fecha solicitada({}/{}) es anterior a la ultima obtenida exitosamente'.format(str(mi_dia)[8:], month)
+                    print 'edite el archivo ultimo_exito.txt para seguir adelante'
+                    return
+
+                if int(month) < min_mes: #si hay cambio de mes, entonces el dia va a cambiar
+                    print 'la fecha solicitada({}/{}) es anterior a la ultima obtenida exitosamente'.format(str(mi_dia)[8:], month)
+                    print 'edite el archivo ultimo_exito.txt para seguir adelante'
+                    return
+                else:
+                    if int(str(mi_dia)[8:]) > min_dia:
+                        obtain_info = True
+
             else: # no hay algun dia previo completado
-                start2 = time.time()
-                scrape_day(str(mi_dia)[8:], month, year, tokens)
-                print 'It took {0:0.1f} seconds'.format(time.time() - start2)
-                load_assets.gen_csv(ADJUDICACIONES_DIARIAS, CAMPOS_ADJUDICACIONES, 'adjudicaciones/adjudicaciones.csv')
-                logging.info('agregadas al csv las adjs')
-                ADJUDICACIONES_DIARIAS = []
+                obtain_info = True
+
+        if obtain_info:
+            start2 = time.time()
+            scrape_day(str(mi_dia)[8:], month, year, tokens)
+            print 'It took {0:0.1f} seconds'.format(time.time() - start2)
+            load_assets.gen_csv(ADJUDICACIONES_DIARIAS, CAMPOS_ADJUDICACIONES, 'adjudicaciones/adjudicaciones.csv')
+            logging.info('agregadas al csv las adjs')
+            ADJUDICACIONES_DIARIAS = []
+            with open('ultimo_exito.txt', 'w') as mydf:
+                min_date = '{},{},{}'.format(str(mi_dia)[8:], month, year)
+                mydf.write(min_date)
                 min_dia = int(str(mi_dia)[8:])
                 min_mes = int(month)
                 min_year = int(year)
                 hay_min = True
-                mydf = open('ultimo_exito.txt', 'w')
-                min_date = '{},{},{}'.format(min_dia, min_mes, min_year)
-                mydf.write(min_date)
-                mydf.close()
                 logging.info('actualizado el archivo de fechas')
-        #if i > 7:
-            #break
-
+            obtain_info = False
 
 
 def scrape_day(day, month, year, tokens):
@@ -557,9 +546,8 @@ def scrape_comprador(nombre, url):
             raise ValueError('error la pagina de la adjudicacion %s', url)
 
         contenido = response.content
-        mydf = open('compradores/html/{}.html'.format(cod), 'w')
-        mydf.writelines(contenido)
-        mydf.close()
+        with open('compradores/html/{}.html'.format(cod), 'w') as mydf:
+            mydf.writelines(contenido)
         # agregar a la lista
         comprador_actual = {'nit':'',
                             'tipo':'',
@@ -613,9 +601,8 @@ def scrape_proveedor(url):
 
         contenido = response.content
         soup = BeautifulSoup(contenido, 'lxml')
-        mydf = open('proveedores/html/{}.html'.format(cod), 'w')
-        mydf.writelines(contenido)
-        mydf.close()
+        with open('proveedores/html/{}.html'.format(cod), 'w') as mydf:
+            mydf.writelines(contenido)
 
 
 # 12 de mayo de 2016 ese dia hay mas de 500 adj
