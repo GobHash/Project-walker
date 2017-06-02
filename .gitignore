@@ -1,7 +1,8 @@
 *.html
 *.log
 dias.txt
-/proveedores/*
-/compradores/*
-/adjudicaciones/*
+proveedores/*
+compradores/*
+adjudicaciones/*
 *.pyc
+ultimo_exito.txt
