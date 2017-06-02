@@ -1,8 +1,10 @@
 *.html
 *.log
 dias.txt
-proveedores/*
-compradores/*
+proveedores/html/*
+proveedores/object/*
+compradores/html/*
+compradores/object/*
 adjudicaciones/*
 *.pyc
 ultimo_exito.txt
