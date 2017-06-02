@@ -26,9 +26,9 @@ def load_proveedores():
                             'fecha_constitucion':'',
                             'inscripcion_rm':'',
                             'representante_legal':''}
-        mydf = open('proveedores/html/{}'.format(proveedor), 'r')
-        contenido = mydf.read()
-        mydf.close()
+        contenido = ''
+        with open('proveedores/html/{}'.format(proveedor), 'r') as mydf:
+            contenido = mydf.read()
         soup = BeautifulSoup(contenido, 'lxml')
         #nit
         tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_lblNIT'})
@@ -89,9 +89,9 @@ def load_compradores():
                             'origenFondos':'',
                             'departamento':'',
                             'municipio':''}
-        mydf = open('compradores/html/{}'.format(comprador), 'r')
-        contenido = mydf.read()
-        mydf.close()
+        contenido = ''
+        with open('compradores/html/{}'.format(comprador), 'r') as mydf:
+            contenido = mydf.read()
         soup = BeautifulSoup(contenido, 'lxml')
         # NIT
         comprador_actual['nit'] = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_Lbl_Nit'}).string.encode('utf-8')
@@ -116,10 +116,10 @@ def gen_csv_comp():
     campos = ['nit','tipo','nombre','origenFondos','departamento','municipio']
     compradores.append(campos)
     for comprador in os.listdir('compradores/html/'):
-        print comprador
         row = []
-        mydf = open('compradores/html/{}'.format(comprador), 'r')
-        contenido = mydf.read()
+        contenido = ''
+        with open('compradores/html/{}'.format(comprador), 'r') as mydf:
+            contenido = mydf.read()
         soup = BeautifulSoup(contenido, 'lxml')
         # NIT
         row.append(soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_Lbl_Nit'}).string.encode('utf-8'))
@@ -148,7 +148,8 @@ def gen_csv_comp():
 
 def gen_csv_prov():
     """
-    genera el csv de los proveedores
+    genera el csv de los proveedores a partir de
+    los html's almacenados localmente
     """
     provs = []
     campos = ['nit','tipo','nombre','fechaConstitucion','inscripcionRM','representanteLegal']
@@ -161,8 +162,9 @@ def gen_csv_prov():
         #proveedor = '11.html'
         #proveedor = '530841.html'
         #proveedor = '57573.html'
-        mydf = open('proveedores/html/{}'.format(proveedor), 'r')
-        contenido = mydf.read()
+        contenido = ''
+        with open('proveedores/html/{}'.format(proveedor), 'r') as mydf:
+            contenido = mydf.read()
         soup = BeautifulSoup(contenido, 'lxml')
         row.append(soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_lblNIT'}).string.encode('utf-8'))
 
@@ -209,24 +211,18 @@ def gen_csv_prov():
                                 quotechar='|', quoting=csv.QUOTE_ALL)
         for pr in provs:
             filewriter.writerow(pr)
-    #soup = BeautifulSoup(contenido, 'lxml')
-
-def obtain_prov_info(html):
-    pass
+    
 
 def gen_csv(adjudicaciones, campos, file):
-    mydf = open('adjudicaciones/adjudicaciones.csv', 'r')
-    contenido = mydf.read()
-    mydf.close()
-    try:
-        with open(file, 'ab') as csvfile:
-            fieldnames = campos
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames, quotechar='|', quoting=csv.QUOTE_ALL)
-            for adjudicacion in adjudicaciones:
-                writer.writerow(adjudicacion)
-    except Exception:
-        mydf = open('adjudicaciones/adjudicaciones.csv', 'w')
-        contenido = mydf.write(contenido)
-        mydf.close()
-        raise ValueError('error al escribir el csv del dia actual')
+    with open('adjudicaciones/adjudicaciones.csv', 'r') as mydf: 
+        contenido = mydf.read()
+        try:
+            with open(file, 'ab') as csvfile:
+                fieldnames = campos
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames, quotechar='|', quoting=csv.QUOTE_ALL)
+                for adjudicacion in adjudicaciones:
+                    writer.writerow(adjudicacion)
+        except Exception:
+            mydf.write(contenido)
+            raise ValueError('error al escribir el csv del dia actual')
 
