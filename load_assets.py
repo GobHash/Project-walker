@@ -6,108 +6,114 @@ en la carga de data de cada anio.
 Para la carga de datos diaria, estas funciones no van a ser necesarias.
 Aqui tambien estan las funciones encargadas de generar los csv's
 """
+import copy
 import csv
 import os
 
 from bs4 import BeautifulSoup
 
 
-def load_proveedores():
+def load_proveedores(proveedor_structure):
     """
     metodo encargado de llenar el diccionario
     de proveedores para que sea facil y rapido usar su info
     cuando se generan los csv's
     """
+    print 'cargando info de proveedores'
     la_lista = {}
+    campos = {'reps': []}
     for proveedor in os.listdir('proveedores/html/'):
-        proveedor_actual = {'nit':'',
-                            'tipo':'',
-                            'nombre':'',
-                            'fecha_constitucion':'',
-                            'inscripcion_rm':'',
-                            'representante_legal':''}
+        es_empresa = True
+        proveedores = []
+        proveedor_actual = proveedor_structure.copy()
+        struc_actual = copy.deepcopy(campos)
         contenido = ''
         with open('proveedores/html/{}'.format(proveedor), 'r') as mydf:
+            #print proveedor
             contenido = mydf.read()
         soup = BeautifulSoup(contenido, 'lxml')
         #nit
         tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_lblNIT'})
-        proveedor_actual['nit'] = tag.string.encode('utf-8')
+        proveedor_actual['nit'] = obtain_tag_string(tag)
+        # nombre
+        tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_lblNombreProv'})
+        proveedor_actual['nombre'] = obtain_tag_string(tag)
 
         base = soup.find('div', attrs={'id': 'MasterGC_ContentBlockHolder_pnl_DatosInscripcion2'}).find('tr')
         # tipo
-        tipo = base.contents[1].string
-        proveedor_actual['tipo'] = tipo.encode('utf-8')
-        #row.append(tipo.replace(',','').encode('utf-8'))
-        # nombre
-        tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_lblNombreProv'})
-        proveedor_actual['nombre'] = tag.string.encode('utf-8')
-        #soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_lblNombreProv'}).string.replace(',,', ' ', 1).replace(',', ' ').encode('utf-8')
-        if 'INDIVIDUAL' in tipo:
-            pass
-        else:
-            base = soup.find('div', attrs={'id': 'MasterGC_ContentBlockHolder_pnl_DatosInscripcion2'}).find('tr')
-            #print len(base.parent.find_all('tr'))
-            # fecha de constitucion
-            # entra a este caso no no hay fecha de constitucion (ver 11.html)
-            if len(base.parent.find_all('tr')) < 3:
-                pass
-            else:
-                tag = base.next_sibling.next_sibling.contents[1]
-                proveedor_actual['fecha_constitucion'] = tag.string.encode('utf-8')
-            # fecha de inscripcion Registro Mercantil
-            #cuando se cumple esta condicion, la empresa solo es provisional (ver 1030082.html)
-            if len(base.parent.find_all('tr')) < 5:
-                tag = base.next_sibling.contents[1]
-                proveedor_actual['inscripcion_rm'] = tag.string.encode('utf-8')
-            else:
-                tag = base.next_sibling.next_sibling.next_sibling.next_sibling.contents[1]
-                proveedor_actual['inscripcion_rm'] = tag.string.encode('utf-8')
-            # representante legal, se quita la ',,' entre nombres y apellidos
-            if soup.find('a', attrs={'id': 'MasterGC_ContentBlockHolder_gvRepresentantesLegales_ctl02_proveedor'}) is None:
-                pass
-            else:
-                tag = soup.find('a', attrs={'id': 'MasterGC_ContentBlockHolder_gvRepresentantesLegales_ctl02_proveedor'})
-                proveedor_actual['representante_legal'] = tag.next_sibling.string.encode('utf-8')
-                #rep_legal = rep_legal.strip().replace(',,', ',', 1).replace(',', ' ')
+        for row in base.parent.findAll('tr'):
+            row_info = obtain_tag_string(row.contents[0])
+            if 'Tipo' in row_info:
+                if 'INDIVIDUAL' in row.contents[1]: # las personas individuales no tienen datos de direccion
+                    es_empresa = False
+                proveedor_actual['tipo'] = obtain_tag_string(row.contents[1])
+            elif 'PROVISIONAL' in row_info:
+                proveedor_actual['inscripcion_rm'] = obtain_tag_string(row.contents[1])
+            elif 'DEFINITIVA' in row_info:
+                proveedor_actual['inscripcion_rm'] = obtain_tag_string(row.contents[1])
+            elif 'Actividad' in row_info:
+                proveedor_actual['activ_economica'] = obtain_tag_string(row.contents[1])
 
-        la_lista[proveedor_actual['nit']] = proveedor_actual
+        """
+        Es importante resaltar que estas direcciones son obtenidas del domicilio fiscal,
+        esto se debe a que no todas las empresas tiene registrado domicilio comercial (11.html).
+        TO-DO: revisar si existe domicilio comercial y obtener esa info
+        """
+        if es_empresa:
+            base = soup.find('div', attrs={'id': 'MasterGC_ContentBlockHolder_pnl_domicilioFiscal2'})
+            for row in base.findAll('tr'):
+                row_info = obtain_tag_string(row.contents[0])
+                if 'Departamento' in row_info:
+                    proveedor_actual['departamento'] = obtain_tag_string(row.contents[1])
+                elif 'Municipio' in row_info:
+                    proveedor_actual['municipio'] = obtain_tag_string(row.contents[1])
+            # representantes legales
+            tag = soup.find('a', attrs={'id': 'MasterGC_ContentBlockHolder_gvRepresentantesLegales_ctl02_proveedor'})
+            if tag is not None:
+                tabla = soup.find('table', attrs={'id': 'MasterGC_ContentBlockHolder_gvRepresentantesLegales'})
+                for rep in tabla.findAll('tr', attrs={'class': 'FilaTablaDetalle'}):
+                    nuevo_prov = proveedor_actual.copy()
+                    nit = rep.find('a')
+                    tag = nit.next_sibling
+                    nuevo_prov['rep_legal'] = '{} {}'.format(obtain_tag_string(nit),
+                                                            obtain_tag_string(tag).strip())
+                    proveedores.append(nuevo_prov)
+            else:
+                proveedores.append(proveedor_actual)    
+        else:
+            proveedores.append(proveedor_actual)
+        for prov in proveedores:
+            struc_actual['reps'].append(prov)
+        la_lista[prov['nit']] = struc_actual
+    print 'terminado de cargar informacion'
     return la_lista
 
 
-def load_compradores():
+def load_compradores(comprador_structure):
     """
     metodo encargado de llenar el diccionario
     de compradores para que sea facil y rapido usar su info
     cuando se generan los csv's
     """
     la_lista = {}
+    print 'cargando info de compradores a memoria'
     for comprador in os.listdir('compradores/html/'):
-        comprador_actual = {'nit':'',
-                            'tipo':'',
-                            'nombre':'',
-                            'origenFondos':'',
-                            'departamento':'',
-                            'municipio':''}
+        nueva_entidad = copy.deepcopy(comprador_structure)
         contenido = ''
         with open('compradores/html/{}'.format(comprador), 'r') as mydf:
             contenido = mydf.read()
         soup = BeautifulSoup(contenido, 'lxml')
-        # NIT
-        comprador_actual['nit'] = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_Lbl_Nit'}).string.encode('utf-8')
-        # tipo, se usa el next sibling 2 veces por que es el salto en los tr que hay que hacer
-        comprador_actual['tipo'] = soup.find('tr', attrs={'id': 'MasterGC_ContentBlockHolder_trNit'}).next_sibling.next_sibling.contents[2].string.encode('utf-8')
         # nombre
-        comprador_actual['nombre'] = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_lblEntidad'}).string.encode('utf-8')
+        tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_lblEntidad'})
+        entidad = obtain_tag_string(tag)
         # origen de fondos
-        if soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_LblEntidadSiaf'}) is not None:
-            comprador_actual['origenFondos'] = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_LblEntidadSiaf'}).string.encode('utf-8')
-        # departamento
-        comprador_actual['departamento'] = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_lblDepartamento'}).string.encode('utf-8')
-        #municipio
-        comprador_actual['municipio'] = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_lblMunicipio'}).string.encode('utf-8')
+        tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_LblEntidadSiaf'})
+        if tag is not None:
+            nueva_entidad['origen_fondos'] = obtain_tag_string(tag)
 
-        la_lista[comprador_actual['nombre']] = comprador_actual
+        la_lista[entidad] = nueva_entidad
+
+    print 'terminados de cargar los compradores a memoria'
     return la_lista
 
 
@@ -122,20 +128,26 @@ def gen_csv_comp():
             contenido = mydf.read()
         soup = BeautifulSoup(contenido, 'lxml')
         # NIT
-        row.append(soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_Lbl_Nit'}).string.encode('utf-8'))
+        tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_Lbl_Nit'})
+        row.append(tag.string.encode('utf-8'))
         # tipo
-        row.append(soup.find('tr', attrs={'id': 'MasterGC_ContentBlockHolder_trNit'}).next_sibling.next_sibling.contents[2].string.encode('utf-8'))
+        tag = soup.find('tr', attrs={'id': 'MasterGC_ContentBlockHolder_trNit'}).next_sibling.next_sibling
+        row.append(tag.contents[2].string.encode('utf-8'))
         # nombre
-        row.append(soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_lblEntidad'}).string.encode('utf-8'))
+        tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_lblEntidad'})
+        row.append(tag.string.encode('utf-8'))
         # origen de fondos
-        if soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_LblEntidadSiaf'}) is not None:
-            row.append(soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_LblEntidadSiaf'}).string.encode('utf-8'))
+        tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_LblEntidadSiaf'})
+        if tag is not None:
+            row.append(tag.string.encode('utf-8'))
         else:
             row.append('')
         # departamento
-        row.append(soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_lblDepartamento'}).string.encode('utf-8'))
+        tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_lblDepartamento'})
+        row.append(tag.string.encode('utf-8'))
         #municipio
-        row.append(soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_lblMunicipio'}).string.encode('utf-8'))
+        tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_lblMunicipio'})
+        row.append(tag.string.encode('utf-8'))
 
         compradores.append(row)
 
@@ -145,6 +157,9 @@ def gen_csv_comp():
                                 quotechar='|', quoting=csv.QUOTE_ALL)
         for pr in compradores:
             filewriter.writerow(pr)
+
+def obtain_tag_string(tag):
+    return tag.string.encode('utf-8')
 
 def gen_csv_prov():
     """
@@ -166,14 +181,17 @@ def gen_csv_prov():
         with open('proveedores/html/{}'.format(proveedor), 'r') as mydf:
             contenido = mydf.read()
         soup = BeautifulSoup(contenido, 'lxml')
-        row.append(soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_lblNIT'}).string.encode('utf-8'))
+        # NIT
+        tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_lblNIT'})
+        row.append(tag.string.encode('utf-8'))
 
         base = soup.find('div', attrs={'id': 'MasterGC_ContentBlockHolder_pnl_DatosInscripcion2'}).find('tr')
         # tipo
         tipo = base.contents[1].string
         row.append(tipo.encode('utf-8'))
         # nombre
-        row.append(soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_lblNombreProv'}).string.encode('utf-8'))
+        tag= soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_lblNombreProv'})
+        row.append(tag.string.encode('utf-8'))
         if 'INDIVIDUAL' in tipo:
             # no hay
             # fecha de constitucion, repLegal, inscripcionRM
@@ -211,18 +229,29 @@ def gen_csv_prov():
                                 quotechar='|', quoting=csv.QUOTE_ALL)
         for pr in provs:
             filewriter.writerow(pr)
-    
 
-def gen_csv(adjudicaciones, campos, file):
-    with open('adjudicaciones/adjudicaciones.csv', 'r') as mydf: 
+
+def gen_csv(adjudicaciones, campos, file, selector):
+    with open(file, 'r') as mydf:
         contenido = mydf.read()
-        try:
-            with open(file, 'ab') as csvfile:
-                fieldnames = campos
-                writer = csv.DictWriter(csvfile, fieldnames=fieldnames, quotechar='|', quoting=csv.QUOTE_ALL)
-                for adjudicacion in adjudicaciones:
-                    writer.writerow(adjudicacion)
-        except Exception:
+    try:
+        with open(file, 'ab') as csvfile:
+            fieldnames = campos
+            writer = csv.DictWriter(csvfile,
+                                    fieldnames=fieldnames,
+                                    quotechar='|',
+                                    quoting=csv.QUOTE_ALL)
+            #writer.writeheader()
+            for adjudicacion in adjudicaciones:
+                selector(adjudicacion, writer)
+    except Exception as exp:
+        with open(file, 'w') as mydf:
             mydf.write(contenido)
-            raise ValueError('error al escribir el csv del dia actual')
+        raise exp
+"""
+def prov_writer(proveedor, writer):
+    for rep in proveedor['reps']:
+        writer.writerow(rep)
 
+gen_csv(algo.values(), PROVEEDOR_BODY.keys(), 'proveedores/object/proveedores.csv', prov_writer)
+"""

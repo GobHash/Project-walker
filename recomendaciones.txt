@@ -1,0 +1,7 @@
+estandarizar la manera en la cual los links de las unidades compradoras son presentados.\
+esto se puede ver en la adj de 1.1.16 y la de multiples proveedores del ministerio de la defensa
+
+quitar las tildes de los nombres de los nodos en la pagina (fechad de finalizacion, etc.)
+
+hacer que el pagineo sea estandar en todos lados, no de 50 en uno y de 5 en otros lados
+hacer que las tablas se llamen igual para contratos abiertos y para adjudicaciones normales

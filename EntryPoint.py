@@ -42,7 +42,7 @@ def main():
     parser.add_argument('-w', '--wait', help='initial number of seconds to wait before reconnecting to host, will grow eventually',
                         type=int, default=60)
     parser.add_argument('-v', "--verbose", type=int, choices=[1, 3],
-                        default=3, help="increase output verbosity to log (activity.log) file")
+                        default=3, help="increase output verbosity to log file (activity.log)")
     args = parser.parse_args()
     if args.verbose == 3:
         verbose = True
@@ -65,9 +65,10 @@ def main():
         try:
             walker.scrape_month(m_year, m_month)
             continuar = False
-
+            print 'el tiempo final de espera fue de {}'.format(espera)
 
         except (ex.ConnectTimeout, ex.ChunkedEncodingError, ex.ConnectionError) as la_exception:
+            print 'hay aumento en el tiempo de espera'
             if ciclo_actual >= max_ciclos:
                 continuar = False
             else:
