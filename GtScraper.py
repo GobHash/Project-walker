@@ -238,7 +238,7 @@ def scrape_month(year, month):
             start2 = time.time()
             scrape_day(str(mi_dia)[8:], month, year, tokens)
             print 'It took {0:0.1f} seconds'.format(time.time() - start2)
-            load_assets.gen_csv(ADJUDICACIONES_DIARIAS, ADJUDICACION_BODY.keys(), 'adjudicaciones/adjudicaciones.csv', adj_writer)
+            """load_assets.gen_csv(ADJUDICACIONES_DIARIAS, ADJUDICACION_BODY.keys(), 'adjudicaciones/adjudicaciones.csv', adj_writer)
             logging.info('agregadas al csv las adjs')
             ADJUDICACIONES_DIARIAS = []
             with open('ultimo_exito.txt', 'w') as mydf:
@@ -249,10 +249,11 @@ def scrape_month(year, month):
                 min_year = int(year)
                 hay_min = True
                 logging.info('actualizado el archivo de fechas')
+            """
             obtain_info = False
 
 
-    #load_assets.gen_csv(COMPRADORES_LIST.values(), COMPRADOR_BODY.keys(), 'compradores/object/compradores.csv', comp_writer)
+    load_assets.gen_csv(COMPRADORES_LIST.values(), COMPRADOR_BODY.keys(), 'compradores/object/compradores.csv', comp_writer)
     # activar esta parte para escribir los proveedores
     #load_assets.gen_csv(COMPRADORES_LIST, COMPRADOR_BODY.keys(), 'proveedores/object/proveedores.csv', prov_writer)
 
@@ -296,15 +297,11 @@ def scrape_day(day, month, year, tokens):
 
     logging.info('Para este dia hay %s adjudicaciones', total_dia)
 
-    adjudicaciones_hoy = []
-    proveedores_hoy = []
-    compradores_hoy = []
     # hay que obtener la info de la primera pagina
     tabla = soup.findAll('tr', attrs={'class': re.compile('TablaFilaMix.')})
     for adjudicacion in tabla:
         #scrape_proveedor(adjudicacion.contents[2].find('a').get('href'))
         scrape_adjudicacion(adjudicacion.contents[5].find('a').get('href'))
-        
         #scrape_adjudicacion()
         # link hacia la adj -> elem.contents[5].find('a').get('href')
         # nombre del proveedor -> elem.contents[2].find('a').string
@@ -358,7 +355,7 @@ def scrape_day(day, month, year, tokens):
             my_params['__VIEWSTATEGENERATOR'] = new_tokens[1]
             my_params['__EVENTVALIDATION'] = new_tokens[2]
 
-        
+
         soup = BeautifulSoup(contenido, 'lxml')
         # ahora toca la parte de procesar la info que tienen las adjudicaciones
         tabla = soup.findAll('tr', attrs={'class': re.compile('TablaFilaMix.')})
@@ -401,10 +398,8 @@ def prov_writer(proveedor, writer):
     for rep in proveedor['reps']:
         writer.writerow(rep)
 def comp_writer(comprador, writer):
-    if len(comprador['unidades']):
-        algo = 23
     for unidad in comprador['unidades']:
-        writer.writerow(unidad)
+        writer.writerow(comprador['unidades'][unidad])
 
 def adj_writer(adjudicacion, writer):
     writer.writerow(adjudicacion)
@@ -432,6 +427,7 @@ def scrape_adjudicacion(url):
     mi_comprador = scrape_comprador(text1,
                                     text2,
                                     comprador.find('a').get('href'))
+    return
     adjudicacion['nit_comprador'] = mi_comprador['nit']
     adjudicacion['nombre_comprador'] = mi_comprador['nombre']
 
@@ -459,31 +455,68 @@ def scrape_adjudicacion(url):
         total_dia = int(totales.contents[0][init+2:fin].strip())
         num_pags = int(ceil(total_dia/5.))
 
+    # DEBUG STATEMENT PARA EL PAGINADOR 
+    if num_pags > 21:
+        with open('paginas.txt', 'a') as mydf:
+            mydf.write(url + '->')
+            mydf.write(str(num_pags))
+            mydf.write('----\n')
+    # valores necesarios para calcular el numero de pag (relativo)
+    offset = num_pags%10
+    band = offset > 1
     # los productos de la primera pagina
     acumulados = obter_cantidad_productos(soup, '')
     if total_dia > 5: # hay que pedir el resto de pags de los productos
         viewstate = soup.find('input', attrs={'id': '__VIEWSTATE'}).get('value')
         viewstate_gen = soup.find('input', attrs={'id': '__VIEWSTATEGENERATOR'}).get('value')
         event_val = soup.find('input', attrs={'id': '__EVENTVALIDATION'}).get('value')
-        acumulados = obter_cantidad_productos(soup, '')
+        #acumulados = obter_cantidad_productos(soup, '')
         my_params = POST_PARAMS.copy()
         del my_params['MasterGC$ContentBlockHolder$rdbOpciones']
         my_params['__VIEWSTATE'] = viewstate
         my_params['__VIEWSTATEGENERATOR'] = viewstate_gen
         my_params['__EVENTVALIDATION'] = event_val
-        my_params['MasterGC%24svrID'] = '%s',num_pags
+        my_params['MasterGC%24svrID'] = '4'
         my_params['MasterGC%24ContentBlockHolder%24cpe_ClientState'] = 'true'
         my_params['MasterGC%24ContentBlockHolder%24Cpe_oferente_ClientState'] = 'false'
-        my_params['MasterGC%24ContentBlockHolder%24Cpe_Contrato_ClientState'] = ''
-        for i in range(2, num_pags+1):
-            if i > 9:
-                my_params['MasterGC$ContentBlockHolder$ScriptManager1'] = 'MasterGC$ContentBlockHolder$PanelProductos|MasterGC$ContentBlockHolder$DGTipoProducto$ctl09$ctl{}'.format(i)
-                my_params['__EVENTTARGET'] = 'MasterGC$ContentBlockHolder$DGTipoProducto$ctl09$ctl{}'.format(i)
-            else:
-                my_params['MasterGC$ContentBlockHolder$ScriptManager1'] = 'MasterGC$ContentBlockHolder$PanelProductos|MasterGC$ContentBlockHolder$DGTipoProducto$ctl09$ctl0{}'.format(i)
-                my_params['__EVENTTARGET'] = 'MasterGC$ContentBlockHolder$DGTipoProducto$ctl09$ctl0{}'.format(i)
+        my_params['MasterGC%24ContentBlockHolder%24Cpe_Contrato_ClientState'] = 'true' if num_pags > 10 else ''
+        for pag_actual in range(2, num_pags+1):
+            #print pag_actual
+            if pag_actual < 12:# los numeros de pagina son absolutos
+                if pag_actual > 9:
+                    my_params['MasterGC$ContentBlockHolder$ScriptManager1'] = 'MasterGC$ContentBlockHolder$PanelProductos|MasterGC$ContentBlockHolder$DGTipoProducto$ctl09$ctl{}'.format(pag_actual)
+                    my_params['__EVENTTARGET'] = 'MasterGC$ContentBlockHolder$DGTipoProducto$ctl09$ctl{}'.format(pag_actual)
+                else:
+                    my_params['MasterGC$ContentBlockHolder$ScriptManager1'] = 'MasterGC$ContentBlockHolder$PanelProductos|MasterGC$ContentBlockHolder$DGTipoProducto$ctl09$ctl0{}'.format(pag_actual)
+                    my_params['__EVENTTARGET'] = 'MasterGC$ContentBlockHolder$DGTipoProducto$ctl09$ctl0{}'.format(pag_actual)
+            else:# los numeros de pagina son relativos
+                la_pag = pag_actual
+                # a partir de la 12va pagina el numero de pagina se vuelve relativo y se calcula
+                # con la expresion de abajo
+                if band:
+                    discriminator = pag_actual%10
+                    if discriminator < 1:
+                        la_pag = 11
+                    elif discriminator < 2:
+                        la_pag = 12
+                    else:
+                        la_pag = discriminator + 1 #if pag_actual <= 19 else 11
+                if pag_actual > num_pags:
+                    la_pag = 11
+                #print la_pag
+                if la_pag > 9:
+                    my_params['MasterGC$ContentBlockHolder$ScriptManager1'] = 'MasterGC$ContentBlockHolder$PanelProductos|MasterGC$ContentBlockHolder$DGTipoProducto$ctl09$ctl{}'.format(la_pag)
+                    my_params['__EVENTTARGET'] = 'MasterGC$ContentBlockHolder$DGTipoProducto$ctl09$ctl{}'.format(la_pag)
+                else:
+                    my_params['MasterGC$ContentBlockHolder$ScriptManager1'] = 'MasterGC$ContentBlockHolder$PanelProductos|MasterGC$ContentBlockHolder$DGTipoProducto$ctl09$ctl0{}'.format(la_pag)
+                    my_params['__EVENTTARGET'] = 'MasterGC$ContentBlockHolder$DGTipoProducto$ctl09$ctl0{}'.format(la_pag)
             content = obtain_html_content('POST', '{}{}'.format(BASE_URL, url), data=my_params)
-            acumulados += obter_cantidad_productos(BeautifulSoup(content, 'lxml'), '')    
+            if (pag_actual%10) == 1:
+                new_tokens = obtain_tokens(content)
+                my_params['__VIEWSTATE'] = new_tokens[0]
+                my_params['__VIEWSTATEGENERATOR'] = new_tokens[1]
+                my_params['__EVENTVALIDATION'] = new_tokens[2]
+            acumulados += obter_cantidad_productos(BeautifulSoup(content, 'lxml'), '')
     acumulados = acumulados[:-1] # quitar el ~ del final
     adjudicacion['unidades'] = acumulados
     # fecha publicada
@@ -531,10 +564,12 @@ def scrape_adjudicacion(url):
         tag = proveedor.contents[4]
         nueva_adj['monto'] = obtain_tag_string(tag)
         adjudicaciones.append(nueva_adj)
+    #print adjudicaciones
     ADJUDICACIONES_DIARIAS.extend(adjudicaciones)
 
 def obter_cantidad_productos(soup, holder):
 
+    #print soup.find('tr', attrs={'class': 'TablaPagineo'})
     # este es para los contratos abiertos
     tag = soup.find('table', attrs={'id': 'MasterGC_ContentBlockHolder_DgRubros'})
     if tag is not None:
@@ -550,8 +585,10 @@ def obter_cantidad_productos(soup, holder):
                 cant = tabla[i].find('span', attrs={'id': 'MasterGC_ContentBlockHolder_DGTipoProducto_ctl0{}_lblcant'.format(i+3)})
             else:
                 cant = tabla[i].find('span', attrs={'id': 'MasterGC_ContentBlockHolder_DGTipoProducto_ctl{}_lblcant'.format(i+3)})
+                #                                         'MasterGC_ContentBlockHolder_DGTipoProducto_ctl03_lblcant'
+            #print cant
             if cant is not None:
-                holder += cant.string.encode('utf-8') + '~'
+                holder += obtain_tag_string(cant) + '~'
     return holder
 
 def scrape_comprador(entidad, unidad_compradora, url):
@@ -735,8 +772,9 @@ def scrape_proveedor(nit, url):
 #load_assets.gen_csv_comp()
 #scrape_month(2016, '02')
 #print 'It took {0:0.1f} seconds'.format(time.time() - start)
-#scrape_month(2016, '01')
-scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4443454&o=9') # error en la obtencio del nit
+scrape_month(2016, '01')
+#scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4380401&o=9') # 109 tipos distintos de productos
+#scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4443454&o=9') # error en la obtencio del nit
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4423550&o=9')
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=1148753&o=9') # adjudicacion de contrato abierto
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4409892&o=9') # 1.1.16 un proveedor varios productos
