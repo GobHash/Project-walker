@@ -120,9 +120,11 @@ CAMPOS_ADJUDICACIONES = ['nit_comprador',
 SESSION = requests.Session()
 
 def cargar_compradores():
+    global COMPRADORES_LIST
     COMPRADORES_LIST = load_assets.load_compradores(TEMPLATE_COMPRADOR)
 
 def cargar_proveedores():
+    global PROVEEDORES_LIST
     PROVEEDORES_LIST = load_assets.load_proveedores(PROVEEDOR_BODY)
 
 def scrapedata():
@@ -633,7 +635,7 @@ def scrape_comprador(entidad, unidad_compradora, url):
     comprador_actual['municipio'] = obtain_tag_string(tag)
     # entidad de la cual es parte la unidad compradora
     comprador_actual['entidad_superior'] = entidad
-
+    """
     if obtener_origen_fondos:
         tag = soup.find('span', attrs={'id': 'MasterGC_BarraNav'})
         link = tag.contents[8].get('href')
@@ -648,7 +650,8 @@ def scrape_comprador(entidad, unidad_compradora, url):
         COMPRADORES_LIST[entidad] = nueva_entidad
     else:
         comprador_actual['origen_fondos'] = COMPRADORES_LIST[entidad]['origen_fondos']
-
+    """
+    print comprador_actual
     COMPRADORES_LIST[entidad]['unidades'][unidad_compradora] = comprador_actual
     return comprador_actual
 
@@ -775,6 +778,7 @@ def scrape_proveedor(nit, url):
 #scrape_month(2016, '02')
 #print 'It took {0:0.1f} seconds'.format(time.time() - start)
 #scrape_month(2016, '01')
+#scrape_comprador('HOSPITAL DE SAN BENITO', 'MINISTERIO DE SALUD PÚBLICA','/compradores/consultaDetEnt.aspx?iUnt2=76&iEnt=9&iUnt=0&iTipo=4')
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4380401&o=9') # 109 tipos distintos de productos
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4443454&o=9') # error en la obtencio del nit
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4423550&o=9')
