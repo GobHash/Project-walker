@@ -246,7 +246,7 @@ def scrape_month(year, month):
             start2 = time.time()
             scrape_day(str(mi_dia)[8:], month, year, tokens)
             print 'It took {0:0.1f} seconds'.format(time.time() - start2)
-            load_assets.gen_csv(ADJUDICACIONES_DIARIAS.values, ADJUDICACION_BODY.keys(), 'adjudicaciones/adjudicaciones3.csv', adj_writer)
+            load_assets.gen_csv(ADJUDICACIONES_DIARIAS.values, ADJUDICACION_BODY.keys(), 'adjudicaciones/adjudicaciones.csv', adj_writer)
             logging.info('agregadas al csv las adjs')
             ADJUDICACIONES_DIARIAS.clear()
             with open('ultimo_exito.txt', 'w') as mydf:
@@ -258,7 +258,6 @@ def scrape_month(year, month):
                 hay_min = True
                 logging.info('actualizado el archivo de fechas')
             obtain_info = False
-            return
 
     load_assets.gen_csv(COMPRADORES_LIST.values(), COMPRADOR_BODY.keys(), 'compradores/object/compradores.csv', comp_writer)
     # activar esta parte para escribir los proveedores
@@ -306,15 +305,7 @@ def scrape_day(day, month, year, tokens):
 
     # hay que obtener la info de la primera pagina
     tabla = soup.findAll('tr', attrs={'class': re.compile('TablaFilaMix.')})
-    for adjudicacion in tabla:
-        #scrape_proveedor(elem.contents[3].string.strip(), adjudicacion.contents[2].find('a').get('href'))
-        scrape_adjudicacion(obtain_tag_string(adjudicacion.contents[5].find('a')), adjudicacion.contents[5].find('a').get('href'))
-        return
-        # link hacia la adj -> elem.contents[5].find('a').get('href')
-        # nombre del proveedor -> elem.contents[2].find('a').string
-        # NIT del proveedor -> elem.contents[3].string
-        #print elem.contents[5].find('a').get('href'), elem.contents[2].find('a').string, elem.contents[3].string
-
+    scrape_table(tabla)
 
     del my_params['MasterGC$ContentBlockHolder$Button1']
     new_tokens = obtain_tokens(contenido)
@@ -366,10 +357,7 @@ def scrape_day(day, month, year, tokens):
         soup = BeautifulSoup(contenido, 'lxml')
         # ahora toca la parte de procesar la info que tienen las adjudicaciones
         tabla = soup.findAll('tr', attrs={'class': re.compile('TablaFilaMix.')})
-        for adjudicacion in tabla:
-            #scrape_proveedor(elem.contents[3].string.strip(), adjudicacion.contents[2].find('a').get('href'))
-            scrape_adjudicacion(obtain_tag_string(adjudicacion.contents[5].find('a')), adjudicacion.contents[5].find('a').get('href'))
-            time.sleep(FACTOR_ESPERA)
+        scrape_table(tabla)
 
     logging.info('ya obtuve las adjudicaciones del dia')
 
@@ -382,6 +370,19 @@ def scrape_day(day, month, year, tokens):
     """
 
 
+def scrape_table(table):
+    """
+    metodo encargado de iterar sobre una tabla y obtener las adjudicaciones
+    y los proveedores
+    :param table: tabla que vamos a recorrer
+    """
+    # link hacia la adj -> elem.contents[5].find('a').get('href')
+    # nombre del proveedor -> elem.contents[2].find('a').string
+    # NIT del proveedor -> elem.contents[3].string
+    #print elem.contents[5].find('a').get('href'), elem.contents[2].find('a').string, elem.contents[3].string
+    for adjudicacion in table:
+        #scrape_proveedor(elem.contents[3].string.strip(), adjudicacion.contents[2].find('a').get('href'))
+        scrape_adjudicacion(obtain_tag_string(adjudicacion.contents[5].find('a')), adjudicacion.contents[5].find('a').get('href'))
 
 def obtain_tokens(contenido):
     """
@@ -402,19 +403,38 @@ def obtain_tokens(contenido):
     return tokens
 
 def prov_writer(proveedor, writer):
+    """
+    metodo encargado de escribir la informacion
+    del proveedor hacia el csv
+    :param proveedor: lista que tiene los dicts de proveedor_body
+    :param writer: el objeto que genera el csv
+    """
     for rep in proveedor['reps']:
         writer.writerow(rep)
 def comp_writer(comprador, writer):
+    """
+    metodo encargado de escribir la informacion
+    del comprador hacia el csv
+    :param comprador: lista que tiene los dicts de comprador_body
+    :param writer: el objeto que genera el csv
+    """
     for unidad in comprador['unidades']:
         writer.writerow(comprador['unidades'][unidad])
 
-def adj_writer(adjudicacion, writer):
-    print adjudicacion
-    writer.writerow(adjudicacion)
+def adj_writer(adjudicaciones, writer):
+    """
+    metodo encargado de escribir la informacion
+    de la adjudicacion hacia el csv
+    :param proveedor: lista que tiene los dicts de adjudicacion_body
+    :param writer: el objeto que genera el csv
+    """
+    for adjudicacion in adjudicaciones:
+        writer.writerow(adjudicacion)
 def scrape_adjudicacion(nog, url):
     """
-    metodo que recibe el numero de adjudicacion y se encarga de obtener
-    la informacion que hay en su pagina
+    metodo que obtiene la informacion de la adjudicacion pedida
+    :param nog: el NOG de guatecompras, para verificar si ya fue obtenida
+    :param url: url hacia la adjudicacion
     """
     logging.debug(url)
     global COMPRADORES_LIST
@@ -477,12 +497,11 @@ def scrape_adjudicacion(nog, url):
     band = offset > 1
     logging.debug('Se va a obtener la info para %s productos', total_dia)
     # los productos de la primera pagina
-    acumulados = obter_cantidad_productos(soup, '')
+    acumulados = obter_cantidad_productos(soup)
     if total_dia > 5: # hay que pedir el resto de pags de los productos
         viewstate = soup.find('input', attrs={'id': '__VIEWSTATE'}).get('value')
         viewstate_gen = soup.find('input', attrs={'id': '__VIEWSTATEGENERATOR'}).get('value')
         event_val = soup.find('input', attrs={'id': '__EVENTVALIDATION'}).get('value')
-        #acumulados = obter_cantidad_productos(soup, '')
         my_params = POST_PARAMS.copy()
         del my_params['MasterGC$ContentBlockHolder$rdbOpciones']
         my_params['__VIEWSTATE'] = viewstate
@@ -520,7 +539,7 @@ def scrape_adjudicacion(nog, url):
                 my_params['__VIEWSTATE'] = new_tokens[0]
                 my_params['__VIEWSTATEGENERATOR'] = new_tokens[1]
                 my_params['__EVENTVALIDATION'] = new_tokens[2]
-            acumulados += obter_cantidad_productos(BeautifulSoup(content, 'lxml'), '')
+            acumulados += obter_cantidad_productos(BeautifulSoup(content, 'lxml'))
     acumulados = acumulados[:-1] # quitar el ~ del final
     adjudicacion['unidades'] = acumulados
     # fecha publicada
@@ -568,13 +587,18 @@ def scrape_adjudicacion(nog, url):
         tag = proveedor.contents[4]
         nueva_adj['monto'] = obtain_tag_string(tag)
         adjudicaciones.append(nueva_adj)
-    #print adjudicaciones
+
     ADJUDICACIONES_DIARIAS[nog] = adjudicaciones
-    print ADJUDICACIONES_DIARIAS
-    #ADJUDICACIONES_DIARIAS.extend(adjudicaciones)
 
-def obter_cantidad_productos(soup, holder):
 
+def obter_cantidad_productos(soup):
+    """
+    metodo que devuelve el numero de productos en una pagina
+    concatenados por '~'
+    :param soup: objeto que tiene cargada la info de la pagina
+    :rtype string: string que tiene las cantidades encontradas
+    """
+    holder = ''
     #print soup.find('tr', attrs={'class': 'TablaPagineo'})
     # este es para los contratos abiertos
     tag = soup.find('table', attrs={'id': 'MasterGC_ContentBlockHolder_DgRubros'})
@@ -599,8 +623,12 @@ def obter_cantidad_productos(soup, holder):
 
 def scrape_comprador(entidad, unidad_compradora, url):
     """
-    funcion que recibe el link hacia el comprador
-    y luego guarda el objeto
+    metodo encargado obtener la info de un comprador
+    y devolver el un diccionario con comprador_body
+    :param entidad: nombre de la entidad superior
+    :param unidad_compradora: nombre de la unidad que buscamos
+    :param url: link hacia la pag de la unidad compradora
+    :rtype dict: diccionario de comprador_body
     """
     global COMPRADORES_LIST
 
@@ -659,10 +687,24 @@ def scrape_comprador(entidad, unidad_compradora, url):
 
 
 def obtain_tag_string(tag):
+    """
+    metodo encargado de obtener el string de una etiqueta html
+    :param tag: la etiqueta de la que vamos a extraer el texto
+    :rtype string: string que representa lo encontrado
+    """
     return tag.string.encode('utf-8').strip()
 
 
 def obtain_html_content(request_type, url, data=None):
+    """
+    metodo encargado de realizar el request hacia la pag solicitada
+    es capaz de volver a pedir la pag si la conexion falla o esperar
+    si es que se sobrecarga al servidor destino
+    :param request_type: si es un POST, GET, etc.
+    :param url: link que vamos a consultar
+    :param data: payload que se envia con el request
+    :rtype string: que tiene el resultado
+    """
     continuar = True
     resp = ''
     espera = FACTOR_ESPERA #segundos de espera inicial
@@ -697,8 +739,10 @@ def obtain_html_content(request_type, url, data=None):
 
 def scrape_proveedor(nit, url):
     """
-    funcion que obtiene los datos del proveedor y los agrega
-    al CSV correspondiente
+    metodo encargado de obtener la informacion
+    del proveedor solicitado y agrega un dict
+    de proveedor_body a la lista de proveedores
+    :param nit: NIT del proveedor
     :param url: link hacia el proveedor
     """
     global PROVEEDORES_LIST
@@ -779,7 +823,7 @@ def scrape_proveedor(nit, url):
 #load_assets.gen_csv_comp()
 #scrape_month(2016, '02')
 #print 'It took {0:0.1f} seconds'.format(time.time() - start)
-scrape_month(2016, '02')
+#scrape_month(2016, '02')
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4447441&o=9')
 #scrape_comprador('HOSPITAL DE SAN BENITO', 'MINISTERIO DE SALUD PÚBLICA','/compradores/consultaDetEnt.aspx?iUnt2=76&iEnt=9&iUnt=0&iTipo=4')
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4380401&o=9') # 109 tipos distintos de productos
@@ -787,6 +831,7 @@ scrape_month(2016, '02')
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4423550&o=9')
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=1148753&o=9') # adjudicacion de contrato abierto
 #scrape_adjudicacion(12, '/concursos/consultaDetalleCon.aspx?nog=4409892&o=9') # 1.1.16 un proveedor varios productos
+#load_assets.gen_csv(ADJUDICACIONES_DIARIAS.values(), ADJUDICACION_BODY.keys(), 'adjudicaciones/adjudicaciones3.csv', adj_writer)
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=6079695&o=9') # multiples proveedores y varios productos
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4391691&o=9')
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4423550&o=9') # 10 pags de productos

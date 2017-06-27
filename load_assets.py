@@ -18,6 +18,7 @@ def load_proveedores(proveedor_structure):
     metodo encargado de llenar el diccionario
     de proveedores para que sea facil y rapido usar su info
     cuando se generan los csv's
+    :param proveedor_structure: diccionario que tiene los campos por llenar
     """
     print 'cargando info de proveedores'
     la_lista = {}
@@ -94,6 +95,7 @@ def load_compradores(comprador_structure):
     metodo encargado de llenar el diccionario
     de compradores para que sea facil y rapido usar su info
     cuando se generan los csv's
+    :param comprador_structure: diccionario con los campos que se van a usar
     """
     la_lista = {}
     print 'cargando info de compradores a memoria'
@@ -121,7 +123,14 @@ def load_compradores(comprador_structure):
 def obtain_tag_string(tag):
     return tag.string.encode('utf-8').strip()
 
-def gen_csv(adjudicaciones, campos, file, selector):
+def gen_csv(data, campos, file, selector):
+    """
+    :param data: la informacion que queremos escribir en el csv (diccionario)
+    :param campos: lista con los atributos del diccionario
+    :param file: path hacia donde vamos a escribir el archivo
+    :param selector: funcion que tiene esta firma(element, writer) y 
+    filtra el elemento para obtener la info para el csv
+    """
     with open(file, 'r') as mydf:
         contenido = mydf.read()
     try:
@@ -131,9 +140,10 @@ def gen_csv(adjudicaciones, campos, file, selector):
                                     fieldnames=fieldnames,
                                     quotechar='|',
                                     quoting=csv.QUOTE_ALL)
-            writer.writeheader()
-            for adjudicacion in adjudicaciones:
-                selector(adjudicacion, writer)
+            if len(contenido) < 1: # el archivo esta vacio
+                writer.writeheader()
+            for element in data:
+                selector(element, writer)
     except Exception as exp:
         with open(file, 'w') as mydf:
             mydf.write(contenido)
