@@ -22,15 +22,23 @@ def main():
         os.makedirs('compradores/html')
         os.makedirs('compradores/object')
         open('compradores/object/compradores.csv', 'w').close()
+    else: # ya existe el dir pero aseguramos crear el archivo
+        if not os.path.isfile('compradores/object/compradores.csv'):
+            open('compradores/object/compradores.csv', 'w').close()
 
-    if not os.path.exists('compradores/object'):
+    if not os.path.exists('proveedores/object'):
         os.makedirs('proveedores/html')
         os.makedirs('proveedores/object')
         open('proveedores/object/proveedores.csv', 'w').close()
+    else: # ya existe el dir pero aseguramos crear el archivo
+        if not os.path.isfile('proveedores/object/proveedores.csv')
+            open('proveedores/object/proveedores.csv', 'w').close()
 
     if not os.path.exists('adjudicaciones'):
         os.makedirs('adjudicaciones')
-        open('adjudicaciones/adjudicaciones.csv', 'w').close()
+    else: # ya existe el dir pero aseguramos crear el archivo
+        if not os.path.isfile('adjudicaciones/adjudicaciones.csv')
+            open('adjudicaciones/adjudicaciones.csv', 'w').close()
 
     parser = argparse.ArgumentParser(description='Script to obtain information from guatecompras.gt and generate csv\'s with it')
     parser.add_argument('year', help='year you wish to obtain data from',
