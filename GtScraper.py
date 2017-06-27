@@ -20,6 +20,7 @@ from bs4 import BeautifulSoup
 import load_assets
 
 logging.basicConfig(filename='activity.log', level=logging.DEBUG)
+logging.info('********************************nueva ejecucion del programa********************************')
 CALENDARIO = calendar.Calendar()
 MAIN_URL = 'http://guatecompras.gt/proveedores/consultaadvprovee.aspx'
 BASE_URL = 'http://www.guatecompras.gt'
@@ -107,7 +108,7 @@ TEMPLATE_COMPRADOR = {'unidades': {},
 #para la version de carga diaria no se va a guardar info de manera local
 PROVEEDORES_LIST = {}#load_assets.load_proveedores(PROVEEDOR_BODY)
 COMPRADORES_LIST = {}#load_assets.load_compradores(TEMPLATE_COMPRADOR)
-ADJUDICACIONES_DIARIAS = []
+ADJUDICACIONES_DIARIAS = {}
 CAMPOS_ADJUDICACIONES = ['nit_comprador',
                          'nit_proveedor',
                          'monto',
@@ -247,7 +248,7 @@ def scrape_month(year, month):
             print 'It took {0:0.1f} seconds'.format(time.time() - start2)
             load_assets.gen_csv(ADJUDICACIONES_DIARIAS, ADJUDICACION_BODY.keys(), 'adjudicaciones/adjudicaciones.csv', adj_writer)
             logging.info('agregadas al csv las adjs')
-            ADJUDICACIONES_DIARIAS = []
+            ADJUDICACIONES_DIARIAS.clear()
             with open('ultimo_exito.txt', 'w') as mydf:
                 min_date = '{},{},{}'.format(str(mi_dia)[8:], month, year)
                 mydf.write(min_date)
@@ -306,9 +307,9 @@ def scrape_day(day, month, year, tokens):
     # hay que obtener la info de la primera pagina
     tabla = soup.findAll('tr', attrs={'class': re.compile('TablaFilaMix.')})
     for adjudicacion in tabla:
-        #scrape_proveedor(adjudicacion.contents[2].find('a').get('href'))
+        #scrape_proveedor(elem.contents[3].string.strip(), adjudicacion.contents[2].find('a').get('href'))
+        print obtain_tag_string(adjudicacion.contents[5].find('a'))
         scrape_adjudicacion(adjudicacion.contents[5].find('a').get('href'))
-        #scrape_adjudicacion()
         # link hacia la adj -> elem.contents[5].find('a').get('href')
         # nombre del proveedor -> elem.contents[2].find('a').string
         # NIT del proveedor -> elem.contents[3].string
@@ -409,7 +410,7 @@ def comp_writer(comprador, writer):
 
 def adj_writer(adjudicacion, writer):
     writer.writerow(adjudicacion)
-def scrape_adjudicacion(url):
+def scrape_adjudicacion(nog, url):
     """
     metodo que recibe el numero de adjudicacion y se encarga de obtener
     la informacion que hay en su pagina
@@ -418,6 +419,10 @@ def scrape_adjudicacion(url):
     global COMPRADORES_LIST
     global ADJUDICACIONES_DIARIAS
 
+    if nog in ADJUDICACIONES_DIARIAS:
+        logging.info('informacion obtenida anteriormente')
+        return
+    logging.info('voy a pedir la info de una adjudicacion')
     contenido = obtain_html_content('GET', '{}{}'.format(BASE_URL, url))
     soup = BeautifulSoup(contenido, 'lxml')
 
@@ -460,14 +465,16 @@ def scrape_adjudicacion(url):
         num_pags = int(ceil(total_dia/5.))
 
     # DEBUG STATEMENT PARA EL PAGINADOR 
-    if num_pags > 21:
+    if num_pags > 19:
         with open('paginas.txt', 'a') as mydf:
             mydf.write(url + '->')
             mydf.write(str(num_pags))
             mydf.write('----\n')
+            return
     # valores necesarios para calcular el numero de pag (relativo)
     offset = num_pags%10
     band = offset > 1
+    logging.debug('Se va a obtener la info para %s productos', total_dia)
     # los productos de la primera pagina
     acumulados = obter_cantidad_productos(soup, '')
     if total_dia > 5: # hay que pedir el resto de pags de los productos
@@ -498,15 +505,7 @@ def scrape_adjudicacion(url):
                 # a partir de la 12va pagina el numero de pagina se vuelve relativo y se calcula
                 # con la expresion de abajo
                 if band:
-                    discriminator = pag_actual%10
-                    if discriminator < 1:
-                        la_pag = 11
-                    elif discriminator < 2:
-                        la_pag = 12
-                    else:
-                        la_pag = discriminator + 1 #if pag_actual <= 19 else 11
-                if pag_actual > num_pags:
-                    la_pag = 11
+                    la_pag = pag_actual - offset + 1
                 #print la_pag
                 if la_pag > 9:
                     my_params['MasterGC$ContentBlockHolder$ScriptManager1'] = 'MasterGC$ContentBlockHolder$PanelProductos|MasterGC$ContentBlockHolder$DGTipoProducto$ctl09$ctl{}'.format(la_pag)
@@ -569,7 +568,7 @@ def scrape_adjudicacion(url):
         nueva_adj['monto'] = obtain_tag_string(tag)
         adjudicaciones.append(nueva_adj)
     #print adjudicaciones
-    ADJUDICACIONES_DIARIAS.extend(adjudicaciones)
+    #ADJUDICACIONES_DIARIAS.extend(adjudicaciones)
 
 def obter_cantidad_productos(soup, holder):
 
@@ -777,7 +776,8 @@ def scrape_proveedor(nit, url):
 #load_assets.gen_csv_comp()
 #scrape_month(2016, '02')
 #print 'It took {0:0.1f} seconds'.format(time.time() - start)
-#scrape_month(2016, '01')
+#scrape_month(2016, '02')
+#scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4447441&o=9')
 #scrape_comprador('HOSPITAL DE SAN BENITO', 'MINISTERIO DE SALUD PÚBLICA','/compradores/consultaDetEnt.aspx?iUnt2=76&iEnt=9&iUnt=0&iTipo=4')
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4380401&o=9') # 109 tipos distintos de productos
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4443454&o=9') # error en la obtencio del nit
