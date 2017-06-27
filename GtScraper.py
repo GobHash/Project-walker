@@ -635,7 +635,7 @@ def scrape_comprador(entidad, unidad_compradora, url):
     comprador_actual['municipio'] = obtain_tag_string(tag)
     # entidad de la cual es parte la unidad compradora
     comprador_actual['entidad_superior'] = entidad
-    """
+
     if obtener_origen_fondos:
         tag = soup.find('span', attrs={'id': 'MasterGC_BarraNav'})
         link = tag.contents[8].get('href')
@@ -650,8 +650,8 @@ def scrape_comprador(entidad, unidad_compradora, url):
         COMPRADORES_LIST[entidad] = nueva_entidad
     else:
         comprador_actual['origen_fondos'] = COMPRADORES_LIST[entidad]['origen_fondos']
-    """
-    print comprador_actual
+
+
     COMPRADORES_LIST[entidad]['unidades'][unidad_compradora] = comprador_actual
     return comprador_actual
 
