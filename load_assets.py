@@ -131,7 +131,7 @@ def gen_csv(adjudicaciones, campos, file, selector):
                                     fieldnames=fieldnames,
                                     quotechar='|',
                                     quoting=csv.QUOTE_ALL)
-            #writer.writeheader()
+            writer.writeheader()
             for adjudicacion in adjudicaciones:
                 selector(adjudicacion, writer)
     except Exception as exp:

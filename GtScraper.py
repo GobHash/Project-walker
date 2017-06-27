@@ -246,7 +246,7 @@ def scrape_month(year, month):
             start2 = time.time()
             scrape_day(str(mi_dia)[8:], month, year, tokens)
             print 'It took {0:0.1f} seconds'.format(time.time() - start2)
-            load_assets.gen_csv(ADJUDICACIONES_DIARIAS, ADJUDICACION_BODY.keys(), 'adjudicaciones/adjudicaciones.csv', adj_writer)
+            load_assets.gen_csv(ADJUDICACIONES_DIARIAS.values, ADJUDICACION_BODY.keys(), 'adjudicaciones/adjudicaciones3.csv', adj_writer)
             logging.info('agregadas al csv las adjs')
             ADJUDICACIONES_DIARIAS.clear()
             with open('ultimo_exito.txt', 'w') as mydf:
@@ -258,7 +258,7 @@ def scrape_month(year, month):
                 hay_min = True
                 logging.info('actualizado el archivo de fechas')
             obtain_info = False
-
+            return
 
     load_assets.gen_csv(COMPRADORES_LIST.values(), COMPRADOR_BODY.keys(), 'compradores/object/compradores.csv', comp_writer)
     # activar esta parte para escribir los proveedores
@@ -308,8 +308,8 @@ def scrape_day(day, month, year, tokens):
     tabla = soup.findAll('tr', attrs={'class': re.compile('TablaFilaMix.')})
     for adjudicacion in tabla:
         #scrape_proveedor(elem.contents[3].string.strip(), adjudicacion.contents[2].find('a').get('href'))
-        print obtain_tag_string(adjudicacion.contents[5].find('a'))
-        scrape_adjudicacion(adjudicacion.contents[5].find('a').get('href'))
+        scrape_adjudicacion(obtain_tag_string(adjudicacion.contents[5].find('a')), adjudicacion.contents[5].find('a').get('href'))
+        return
         # link hacia la adj -> elem.contents[5].find('a').get('href')
         # nombre del proveedor -> elem.contents[2].find('a').string
         # NIT del proveedor -> elem.contents[3].string
@@ -367,8 +367,8 @@ def scrape_day(day, month, year, tokens):
         # ahora toca la parte de procesar la info que tienen las adjudicaciones
         tabla = soup.findAll('tr', attrs={'class': re.compile('TablaFilaMix.')})
         for adjudicacion in tabla:
-            #scrape_proveedor(adjudicacion.contents[2].find('a').get('href'))
-            scrape_adjudicacion(adjudicacion.contents[5].find('a').get('href'))
+            #scrape_proveedor(elem.contents[3].string.strip(), adjudicacion.contents[2].find('a').get('href'))
+            scrape_adjudicacion(obtain_tag_string(adjudicacion.contents[5].find('a')), adjudicacion.contents[5].find('a').get('href'))
             time.sleep(FACTOR_ESPERA)
 
     logging.info('ya obtuve las adjudicaciones del dia')
@@ -409,6 +409,7 @@ def comp_writer(comprador, writer):
         writer.writerow(comprador['unidades'][unidad])
 
 def adj_writer(adjudicacion, writer):
+    print adjudicacion
     writer.writerow(adjudicacion)
 def scrape_adjudicacion(nog, url):
     """
@@ -568,6 +569,8 @@ def scrape_adjudicacion(nog, url):
         nueva_adj['monto'] = obtain_tag_string(tag)
         adjudicaciones.append(nueva_adj)
     #print adjudicaciones
+    ADJUDICACIONES_DIARIAS[nog] = adjudicaciones
+    print ADJUDICACIONES_DIARIAS
     #ADJUDICACIONES_DIARIAS.extend(adjudicaciones)
 
 def obter_cantidad_productos(soup, holder):
@@ -776,14 +779,14 @@ def scrape_proveedor(nit, url):
 #load_assets.gen_csv_comp()
 #scrape_month(2016, '02')
 #print 'It took {0:0.1f} seconds'.format(time.time() - start)
-#scrape_month(2016, '02')
+scrape_month(2016, '02')
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4447441&o=9')
 #scrape_comprador('HOSPITAL DE SAN BENITO', 'MINISTERIO DE SALUD PÚBLICA','/compradores/consultaDetEnt.aspx?iUnt2=76&iEnt=9&iUnt=0&iTipo=4')
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4380401&o=9') # 109 tipos distintos de productos
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4443454&o=9') # error en la obtencio del nit
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4423550&o=9')
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=1148753&o=9') # adjudicacion de contrato abierto
-#scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4409892&o=9') # 1.1.16 un proveedor varios productos
+#scrape_adjudicacion(12, '/concursos/consultaDetalleCon.aspx?nog=4409892&o=9') # 1.1.16 un proveedor varios productos
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=6079695&o=9') # multiples proveedores y varios productos
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4391691&o=9')
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4423550&o=9') # 10 pags de productos
