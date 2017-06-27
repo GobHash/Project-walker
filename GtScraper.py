@@ -121,10 +121,18 @@ CAMPOS_ADJUDICACIONES = ['nit_comprador',
 SESSION = requests.Session()
 
 def cargar_compradores():
+    """
+    metodo encargado de poblar los compradores conocidos
+    con la info local
+    """
     global COMPRADORES_LIST
     COMPRADORES_LIST = load_assets.load_compradores(TEMPLATE_COMPRADOR)
 
 def cargar_proveedores():
+    """
+    metodo encargado de poblar los proveedores conocidos
+    con la info local
+    """
     global PROVEEDORES_LIST
     PROVEEDORES_LIST = load_assets.load_proveedores(PROVEEDOR_BODY)
 
