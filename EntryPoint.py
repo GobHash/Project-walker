@@ -31,13 +31,13 @@ def main():
         os.makedirs('proveedores/object')
         open('proveedores/object/proveedores.csv', 'w').close()
     else: # ya existe el dir pero aseguramos crear el archivo
-        if not os.path.isfile('proveedores/object/proveedores.csv')
+        if not os.path.isfile('proveedores/object/proveedores.csv'):
             open('proveedores/object/proveedores.csv', 'w').close()
 
     if not os.path.exists('adjudicaciones'):
         os.makedirs('adjudicaciones')
     else: # ya existe el dir pero aseguramos crear el archivo
-        if not os.path.isfile('adjudicaciones/adjudicaciones.csv')
+        if not os.path.isfile('adjudicaciones/adjudicaciones.csv'):
             open('adjudicaciones/adjudicaciones.csv', 'w').close()
 
     parser = argparse.ArgumentParser(description='Script to obtain information from guatecompras.gt and generate csv\'s with it')
