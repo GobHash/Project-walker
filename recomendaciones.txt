@@ -5,3 +5,4 @@ quitar las tildes de los nombres de los nodos en la pagina (fechad de finalizaci
 
 hacer que el pagineo sea estandar en todos lados, no de 50 en uno y de 5 en otros lados
 hacer que las tablas se llamen igual para contratos abiertos y para adjudicaciones normales
+
