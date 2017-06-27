@@ -61,6 +61,7 @@ def main():
     treshold = inicial*20
     max_ciclos = 5000
     ciclo_actual = 1
+    walker.cargar_compradores()
     while continuar:
         try:
             walker.scrape_month(m_year, m_month)

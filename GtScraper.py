@@ -8,7 +8,6 @@ import calendar
 import copy
 import datetime
 import logging
-import os
 from random import randint
 import re
 import time
@@ -107,7 +106,7 @@ TEMPLATE_COMPRADOR = {'unidades': {},
 #estas lineas son para la carga de datos en masa
 #para la version de carga diaria no se va a guardar info de manera local
 PROVEEDORES_LIST = {}#load_assets.load_proveedores(PROVEEDOR_BODY)
-COMPRADORES_LIST = load_assets.load_compradores(TEMPLATE_COMPRADOR)
+COMPRADORES_LIST = {}#load_assets.load_compradores(TEMPLATE_COMPRADOR)
 ADJUDICACIONES_DIARIAS = []
 CAMPOS_ADJUDICACIONES = ['nit_comprador',
                          'nit_proveedor',
@@ -119,6 +118,12 @@ CAMPOS_ADJUDICACIONES = ['nit_comprador',
                          'categoria']
 #esto sirve para que las cookies sean persistentes entre requests
 SESSION = requests.Session()
+
+def cargar_compradores():
+    COMPRADORES_LIST = load_assets.load_compradores(TEMPLATE_COMPRADOR)
+
+def cargar_proveedores():
+    PROVEEDORES_LIST = load_assets.load_proveedores(PROVEEDOR_BODY)
 
 def scrapedata():
     """
@@ -238,7 +243,7 @@ def scrape_month(year, month):
             start2 = time.time()
             scrape_day(str(mi_dia)[8:], month, year, tokens)
             print 'It took {0:0.1f} seconds'.format(time.time() - start2)
-            """load_assets.gen_csv(ADJUDICACIONES_DIARIAS, ADJUDICACION_BODY.keys(), 'adjudicaciones/adjudicaciones.csv', adj_writer)
+            load_assets.gen_csv(ADJUDICACIONES_DIARIAS, ADJUDICACION_BODY.keys(), 'adjudicaciones/adjudicaciones.csv', adj_writer)
             logging.info('agregadas al csv las adjs')
             ADJUDICACIONES_DIARIAS = []
             with open('ultimo_exito.txt', 'w') as mydf:
@@ -249,7 +254,6 @@ def scrape_month(year, month):
                 min_year = int(year)
                 hay_min = True
                 logging.info('actualizado el archivo de fechas')
-            """
             obtain_info = False
 
 
@@ -408,7 +412,6 @@ def scrape_adjudicacion(url):
     metodo que recibe el numero de adjudicacion y se encarga de obtener
     la informacion que hay en su pagina
     """
-    print url
     logging.debug(url)
     global COMPRADORES_LIST
     global ADJUDICACIONES_DIARIAS
@@ -427,7 +430,6 @@ def scrape_adjudicacion(url):
     mi_comprador = scrape_comprador(text1,
                                     text2,
                                     comprador.find('a').get('href'))
-    return
     adjudicacion['nit_comprador'] = mi_comprador['nit']
     adjudicacion['nombre_comprador'] = mi_comprador['nombre']
 
@@ -652,7 +654,7 @@ def scrape_comprador(entidad, unidad_compradora, url):
 
 
 def obtain_tag_string(tag):
-    return tag.string.encode('utf-8')
+    return tag.string.encode('utf-8').strip()
 
 
 def obtain_html_content(request_type, url, data=None):
@@ -672,7 +674,7 @@ def obtain_html_content(request_type, url, data=None):
                 resp = response
                 continuar = False
                 # activarlo si comienzan a bloquear muy frecuentemente
-                time.sleep(2) # espera 2 segundos para evitar cargar el server con el siguiente
+                time.sleep(1) # espera 2 segundos para evitar cargar el server con el siguiente
             else: # hay que volver a pedir la info al server
                 ciclo_actual += 1
 
@@ -772,7 +774,7 @@ def scrape_proveedor(nit, url):
 #load_assets.gen_csv_comp()
 #scrape_month(2016, '02')
 #print 'It took {0:0.1f} seconds'.format(time.time() - start)
-scrape_month(2016, '01')
+#scrape_month(2016, '01')
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4380401&o=9') # 109 tipos distintos de productos
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4443454&o=9') # error en la obtencio del nit
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4423550&o=9')
