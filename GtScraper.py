@@ -177,6 +177,7 @@ def scrapeyear(year, mes='15'):
 def scrape_month(year, month):
     """
     metodo encargado de iterar sobre el mes recibido en los params
+    y generar los csv correspondientes
     :param year: año para obtener.
     :param month: el mes en especifico que se quiere obtener.
     """
