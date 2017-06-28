@@ -255,7 +255,10 @@ def scrape_month(year, month):
             start2 = time.time()
             scrape_day(str(mi_dia)[8:], month, year, tokens)
             print 'It took {0:0.1f} seconds'.format(time.time() - start2)
-            load_assets.gen_csv(ADJUDICACIONES_DIARIAS.values, ADJUDICACION_BODY.keys(), 'adjudicaciones/adjudicaciones.csv', adj_writer)
+            load_assets.gen_csv(ADJUDICACIONES_DIARIAS.values(),
+                                ADJUDICACION_BODY.keys(),
+                                'adjudicaciones/adjudicaciones.csv',
+                                adj_writer)
             logging.info('agregadas al csv las adjs')
             ADJUDICACIONES_DIARIAS.clear()
             with open('ultimo_exito.txt', 'w') as mydf:
@@ -654,7 +657,7 @@ def scrape_comprador(entidad, unidad_compradora, url):
     if url.startswith('/'):
         url = '{}{}'.format(BASE_URL, url)
 
-    logging.debug('obteniendo la info del comprador %s -> %s', unidad_compradora, entidad)
+    logging.info('obteniendo la info del comprador %s -> %s', unidad_compradora, entidad)
 
     contenido = obtain_html_content('GET', url)
     comprador_actual = COMPRADOR_BODY.copy()
