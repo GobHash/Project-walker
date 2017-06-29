@@ -855,7 +855,7 @@ def scrape_proveedor(nit, url):
 #scrape_month(2016, '02')
 #print 'It took {0:0.1f} seconds'.format(time.time() - start)
 #scrape_month(2016, '02')
-scrape_adjudicacion(123,'/concursos/consultaDetalleCon.aspx?nog=667048&o=9') # contrato abierto sin productos
+#scrape_adjudicacion(123,'/concursos/consultaDetalleCon.aspx?nog=667048&o=9') # contrato abierto sin productos
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4447441&o=9')
 #scrape_comprador('HOSPITAL DE SAN BENITO', 'MINISTERIO DE SALUD PÚBLICA','/compradores/consultaDetEnt.aspx?iUnt2=76&iEnt=9&iUnt=0&iTipo=4')
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4380401&o=9') # 109 tipos distintos de productos
