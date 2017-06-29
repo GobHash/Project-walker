@@ -74,13 +74,13 @@ ADJUDICACION_BODY = {'nog': '',
                      'modalidad_compra':'',
                      'nit_comprador':'',
                      'nombre_comprador': '',
-                     'fecha_publicada':'',
-                     'fecha_presentacion_ofertas':'',
-                     'fecha_cierre_ofertas':'',
+                     'fecha_publicada':'null',
+                     'fecha_presentacion_ofertas':'null',
+                     'fecha_cierre_ofertas':'null',
                      'tipo_ofertas':'',
-                     'fecha_adjudicada':'',
+                     'fecha_adjudicada':'null',
                      'status':'',
-                     'unidades':'',
+                     'unidades':'null',
                      'nit_proveedor':'',
                      'monto':''}
 # estructura del proveedor
@@ -109,14 +109,6 @@ TEMPLATE_COMPRADOR = {'unidades': {},
 PROVEEDORES_LIST = {}#load_assets.load_proveedores(PROVEEDOR_BODY)
 COMPRADORES_LIST = {}#load_assets.load_compradores(TEMPLATE_COMPRADOR)
 ADJUDICACIONES_DIARIAS = {}
-CAMPOS_ADJUDICACIONES = ['nit_comprador',
-                         'nit_proveedor',
-                         'monto',
-                         'unidades',
-                         'fecha_adjudicada',
-                         'fecha_publicada',
-                         'modalidad_compra',
-                         'categoria']
 #esto sirve para que las cookies sean persistentes entre requests
 SESSION = requests.Session()
 
@@ -487,93 +479,104 @@ def scrape_adjudicacion(nog, url):
     # estatus
     tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_txtEstatus'})
     adjudicacion['status'] = obtain_tag_string(tag)
-    # unidades compradas (cantidad en la adjudicacion)
 
+    # unidades compradas (cantidad en la adjudicacion)
+    obtener_cantidad = True
     if soup.find('table', attrs={'id': 'MasterGC_ContentBlockHolder_DgRubros'}) is None: # las adjudicaciones "normales"
         totales = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_lblFilas'})
-        init = totales.contents[0].index('de')
-        fin = totales.contents[0].index('tipos')
-        total_dia = int(totales.contents[0][init+2:fin].strip())
-        num_pags = int(ceil(total_dia/5.))
+        if totales is not None:
+            init = totales.contents[0].index('de')
+            fin = totales.contents[0].index('tipos')
+        else: # hay veces que no hay cantidades /concursos/consultaDetalleCon.aspx?nog=667048&o=9
+            obtener_cantidad = False
     else: # los contratos abiertos
         totales = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_lblFilasRubros'})
-        init = totales.contents[0].index('de')
-        fin = totales.contents[0].index('rubros')
+        if totales is not None: # se revisa xq hay contratos abiertos sin productos
+            init = totales.contents[0].index('de')
+            fin = totales.contents[0].index('rubros')
+        else:
+            obtener_cantidad = False
+
+    if obtener_cantidad:
         total_dia = int(totales.contents[0][init+2:fin].strip())
         num_pags = int(ceil(total_dia/5.))
-
-    # DEBUG STATEMENT PARA EL PAGINADOR 
-    if num_pags > 19:
-        with open('paginas.txt', 'a') as mydf:
-            mydf.write(url + '->')
-            mydf.write(str(num_pags))
-            mydf.write('----\n')
-            return
-    # valores necesarios para calcular el numero de pag (relativo)
-    offset = num_pags%10
-    band = offset > 1
-    logging.debug('Se va a obtener la info para %s productos', total_dia)
-    # los productos de la primera pagina
-    acumulados = obter_cantidad_productos(soup)
-    if total_dia > 5: # hay que pedir el resto de pags de los productos
-        viewstate = soup.find('input', attrs={'id': '__VIEWSTATE'}).get('value')
-        viewstate_gen = soup.find('input', attrs={'id': '__VIEWSTATEGENERATOR'}).get('value')
-        event_val = soup.find('input', attrs={'id': '__EVENTVALIDATION'}).get('value')
-        my_params = POST_PARAMS.copy()
-        del my_params['MasterGC$ContentBlockHolder$rdbOpciones']
-        my_params['__VIEWSTATE'] = viewstate
-        my_params['__VIEWSTATEGENERATOR'] = viewstate_gen
-        my_params['__EVENTVALIDATION'] = event_val
-        my_params['MasterGC%24svrID'] = '4'
-        my_params['MasterGC%24ContentBlockHolder%24cpe_ClientState'] = 'true'
-        my_params['MasterGC%24ContentBlockHolder%24Cpe_oferente_ClientState'] = 'false'
-        my_params['MasterGC%24ContentBlockHolder%24Cpe_Contrato_ClientState'] = 'true' if num_pags > 10 else ''
-        for pag_actual in range(2, num_pags+1):
-            #print pag_actual
-            if pag_actual < 12:# los numeros de pagina son absolutos
-                if pag_actual > 9:
-                    my_params['MasterGC$ContentBlockHolder$ScriptManager1'] = 'MasterGC$ContentBlockHolder$PanelProductos|MasterGC$ContentBlockHolder$DGTipoProducto$ctl09$ctl{}'.format(pag_actual)
-                    my_params['__EVENTTARGET'] = 'MasterGC$ContentBlockHolder$DGTipoProducto$ctl09$ctl{}'.format(pag_actual)
-                else:
-                    my_params['MasterGC$ContentBlockHolder$ScriptManager1'] = 'MasterGC$ContentBlockHolder$PanelProductos|MasterGC$ContentBlockHolder$DGTipoProducto$ctl09$ctl0{}'.format(pag_actual)
-                    my_params['__EVENTTARGET'] = 'MasterGC$ContentBlockHolder$DGTipoProducto$ctl09$ctl0{}'.format(pag_actual)
-            else:# los numeros de pagina son relativos
-                la_pag = pag_actual
-                # a partir de la 12va pagina el numero de pagina se vuelve relativo y se calcula
-                # con la expresion de abajo
-                if band:
-                    la_pag = pag_actual - offset + 1
-                #print la_pag
-                if la_pag > 9:
-                    my_params['MasterGC$ContentBlockHolder$ScriptManager1'] = 'MasterGC$ContentBlockHolder$PanelProductos|MasterGC$ContentBlockHolder$DGTipoProducto$ctl09$ctl{}'.format(la_pag)
-                    my_params['__EVENTTARGET'] = 'MasterGC$ContentBlockHolder$DGTipoProducto$ctl09$ctl{}'.format(la_pag)
-                else:
-                    my_params['MasterGC$ContentBlockHolder$ScriptManager1'] = 'MasterGC$ContentBlockHolder$PanelProductos|MasterGC$ContentBlockHolder$DGTipoProducto$ctl09$ctl0{}'.format(la_pag)
-                    my_params['__EVENTTARGET'] = 'MasterGC$ContentBlockHolder$DGTipoProducto$ctl09$ctl0{}'.format(la_pag)
-            content = obtain_html_content('POST', '{}{}'.format(BASE_URL, url), data=my_params)
-            if (pag_actual%10) == 1:
-                new_tokens = obtain_tokens(content)
-                my_params['__VIEWSTATE'] = new_tokens[0]
-                my_params['__VIEWSTATEGENERATOR'] = new_tokens[1]
-                my_params['__EVENTVALIDATION'] = new_tokens[2]
-            acumulados += obter_cantidad_productos(BeautifulSoup(content, 'lxml'))
-    acumulados = acumulados[:-1] # quitar el ~ del final
-    adjudicacion['unidades'] = acumulados
+        # DEBUG STATEMENT PARA EL PAGINADOR 
+        if num_pags > 19:
+            with open('paginas.txt', 'a') as mydf:
+                mydf.write(url + '->')
+                mydf.write(str(num_pags))
+                mydf.write('----\n')
+                return
+        # valores necesarios para calcular el numero de pag (relativo)
+        offset = num_pags%10
+        band = offset > 1
+        logging.debug('Se va a obtener la info para %s productos', total_dia)
+        # los productos de la primera pagina
+        acumulados = obter_cantidad_productos(soup)
+        if total_dia > 5: # hay que pedir el resto de pags de los productos
+            viewstate = soup.find('input', attrs={'id': '__VIEWSTATE'}).get('value')
+            viewstate_gen = soup.find('input', attrs={'id': '__VIEWSTATEGENERATOR'}).get('value')
+            event_val = soup.find('input', attrs={'id': '__EVENTVALIDATION'}).get('value')
+            my_params = POST_PARAMS.copy()
+            del my_params['MasterGC$ContentBlockHolder$rdbOpciones']
+            my_params['__VIEWSTATE'] = viewstate
+            my_params['__VIEWSTATEGENERATOR'] = viewstate_gen
+            my_params['__EVENTVALIDATION'] = event_val
+            my_params['MasterGC%24svrID'] = '4'
+            my_params['MasterGC%24ContentBlockHolder%24cpe_ClientState'] = 'true'
+            my_params['MasterGC%24ContentBlockHolder%24Cpe_oferente_ClientState'] = 'false'
+            my_params['MasterGC%24ContentBlockHolder%24Cpe_Contrato_ClientState'] = 'true' if num_pags > 10 else ''
+            for pag_actual in range(2, num_pags+1):
+                #print pag_actual
+                if pag_actual < 12:# los numeros de pagina son absolutos
+                    if pag_actual > 9:
+                        my_params['MasterGC$ContentBlockHolder$ScriptManager1'] = 'MasterGC$ContentBlockHolder$PanelProductos|MasterGC$ContentBlockHolder$DGTipoProducto$ctl09$ctl{}'.format(pag_actual)
+                        my_params['__EVENTTARGET'] = 'MasterGC$ContentBlockHolder$DGTipoProducto$ctl09$ctl{}'.format(pag_actual)
+                    else:
+                        my_params['MasterGC$ContentBlockHolder$ScriptManager1'] = 'MasterGC$ContentBlockHolder$PanelProductos|MasterGC$ContentBlockHolder$DGTipoProducto$ctl09$ctl0{}'.format(pag_actual)
+                        my_params['__EVENTTARGET'] = 'MasterGC$ContentBlockHolder$DGTipoProducto$ctl09$ctl0{}'.format(pag_actual)
+                else:# los numeros de pagina son relativos
+                    la_pag = pag_actual
+                    # a partir de la 12va pagina el numero de pagina se vuelve relativo y se calcula
+                    # con la expresion de abajo
+                    if band:
+                        la_pag = pag_actual - offset + 1
+                    #print la_pag
+                    if la_pag > 9:
+                        my_params['MasterGC$ContentBlockHolder$ScriptManager1'] = 'MasterGC$ContentBlockHolder$PanelProductos|MasterGC$ContentBlockHolder$DGTipoProducto$ctl09$ctl{}'.format(la_pag)
+                        my_params['__EVENTTARGET'] = 'MasterGC$ContentBlockHolder$DGTipoProducto$ctl09$ctl{}'.format(la_pag)
+                    else:
+                        my_params['MasterGC$ContentBlockHolder$ScriptManager1'] = 'MasterGC$ContentBlockHolder$PanelProductos|MasterGC$ContentBlockHolder$DGTipoProducto$ctl09$ctl0{}'.format(la_pag)
+                        my_params['__EVENTTARGET'] = 'MasterGC$ContentBlockHolder$DGTipoProducto$ctl09$ctl0{}'.format(la_pag)
+                content = obtain_html_content('POST', '{}{}'.format(BASE_URL, url), data=my_params)
+                if (pag_actual%10) == 1:
+                    new_tokens = obtain_tokens(content)
+                    my_params['__VIEWSTATE'] = new_tokens[0]
+                    my_params['__VIEWSTATEGENERATOR'] = new_tokens[1]
+                    my_params['__EVENTVALIDATION'] = new_tokens[2]
+                acumulados += obter_cantidad_productos(BeautifulSoup(content, 'lxml'))
+        acumulados = acumulados[:-1] # quitar el ~ del final
+        adjudicacion['unidades'] = acumulados
     # fecha publicada
     tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_txtFechaPub'})
-    adjudicacion['fecha_publicada'] = obtain_tag_string(tag)
+    if tag is not None:
+        adjudicacion['fecha_publicada'] = obtain_tag_string(tag)
     # fecha de presetacion ofertas
     tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_txtFechaPresentacion'})
-    adjudicacion['fecha_presentacion_ofertas'] = obtain_tag_string(tag)
+    if tag is not None:
+        adjudicacion['fecha_presentacion_ofertas'] = obtain_tag_string(tag)
     # fecha de cierre de ofertas
     tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_txtFechacierreRecep'})
-    adjudicacion['fecha_cierre_ofertas'] = obtain_tag_string(tag)
+    if tag is not None:
+        adjudicacion['fecha_cierre_ofertas'] = obtain_tag_string(tag)
     # fecha de cierre de ofertas
     tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_txtFechacierreRecep'})
-    adjudicacion['fecha_cierre_ofertas'] = obtain_tag_string(tag)
+    if tag is not None:
+        adjudicacion['fecha_cierre_ofertas'] = obtain_tag_string(tag)
     # fecha de adjudicacion
     tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_txtFechaFinalización'})
-    adjudicacion['fecha_adjudicada'] = obtain_tag_string(tag)
+    if tag is not None:
+        adjudicacion['fecha_adjudicada'] = obtain_tag_string(tag)
     # tipo de ofertas
     tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_txtRecepcionOferta'}).find('b')
     adjudicacion['tipo_ofertas'] = obtain_tag_string(tag)
@@ -604,7 +607,8 @@ def scrape_adjudicacion(nog, url):
         tag = proveedor.contents[4]
         nueva_adj['monto'] = obtain_tag_string(tag)
         adjudicaciones.append(nueva_adj)
-
+    for adj in adjudicaciones:
+        print adj
     ADJUDICACIONES_DIARIAS[nog] = adjudicaciones
 
 
@@ -851,6 +855,7 @@ def scrape_proveedor(nit, url):
 #scrape_month(2016, '02')
 #print 'It took {0:0.1f} seconds'.format(time.time() - start)
 #scrape_month(2016, '02')
+scrape_adjudicacion(123,'/concursos/consultaDetalleCon.aspx?nog=667048&o=9') # contrato abierto sin productos
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4447441&o=9')
 #scrape_comprador('HOSPITAL DE SAN BENITO', 'MINISTERIO DE SALUD PÚBLICA','/compradores/consultaDetEnt.aspx?iUnt2=76&iEnt=9&iUnt=0&iTipo=4')
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4380401&o=9') # 109 tipos distintos de productos
