@@ -240,12 +240,14 @@ def scrape_month(year, month):
                     print 'edite el archivo ultimo_exito.txt para seguir adelante'
                     return
 
-                if int(month) < min_mes: #si hay cambio de mes, entonces el dia va a cambiar
+                if int(month) < min_mes: # datos de un mes anterior
                     print 'la fecha solicitada({}/{}) es anterior a la ultima obtenida exitosamente'.format(str(mi_dia)[8:], month)
                     print 'edite el archivo ultimo_exito.txt para seguir adelante'
                     return
-                else:
-                    if int(str(mi_dia)[8:]) > min_dia:
+                else: #si hay cambio de mes, entonces el dia va a cambiar
+                    if int(month) > min_mes: # estoy en un mes posterior
+                        obtain_info = True
+                    elif int(str(mi_dia)[8:]) > min_dia: # mismo mes
                         obtain_info = True
 
             else: # no hay algun dia previo completado
@@ -271,7 +273,10 @@ def scrape_month(year, month):
                 logging.info('actualizado el archivo de fechas')
             obtain_info = False
 
-    load_assets.gen_csv(COMPRADORES_LIST.values(), COMPRADOR_BODY.keys(), 'compradores/object/compradores.csv', comp_writer)
+    load_assets.gen_csv(COMPRADORES_LIST.values(),
+                        COMPRADOR_BODY.keys(),
+                        'compradores/object/compradores.csv',
+                        comp_writer)
     # activar esta parte para escribir los proveedores
     #load_assets.gen_csv(COMPRADORES_LIST, COMPRADOR_BODY.keys(), 'proveedores/object/proveedores.csv', prov_writer)
 
@@ -665,6 +670,16 @@ def scrape_comprador(entidad, unidad_compradora, url):
 
     # NIT
     tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_Lbl_Nit'})
+    cnt = 0
+    while tag.string is None: # fix pirata xq es comun que truene en este elemento
+        logging.error('el tag del NIT venia vacio')
+        if cnt > 100:
+            raise ValueError('ERROR AL TRATAR DE CONSEGUIR EL NIT')
+        contenido = obtain_html_content('GET', url)
+        soup = BeautifulSoup(contenido, 'lxml')
+        tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_Lbl_Nit'})
+        cnt += 1
+    #print tag
     comprador_actual['nit'] = obtain_tag_string(tag)
     # nombre de la unidad compradora
     tag = soup.find('tr', attrs={'id': 'MasterGC_ContentBlockHolder_trNit'}).next_sibling.next_sibling.contents[2]
