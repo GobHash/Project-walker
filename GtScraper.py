@@ -607,8 +607,7 @@ def scrape_adjudicacion(nog, url):
         tag = proveedor.contents[4]
         nueva_adj['monto'] = obtain_tag_string(tag)
         adjudicaciones.append(nueva_adj)
-    for adj in adjudicaciones:
-        print adj
+
     ADJUDICACIONES_DIARIAS[nog] = adjudicaciones
 
 
