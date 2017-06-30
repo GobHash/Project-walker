@@ -889,8 +889,8 @@ def scrape_proveedor(nit, url):
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4380401&o=9') # 109 tipos distintos de productos
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4443454&o=9') # error en la obtencio del nit
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4423550&o=9')
-scrape_adjudicacion(12, '/concursos/consultaDetalleCon.aspx?nog=1148753&o=9') # adjudicacion de contrato abierto
-scrape_adjudicacion(13, '/concursos/consultaDetalleCon.aspx?nog=2347369&o=9') # multiples rubros de contrato abierto
+#scrape_adjudicacion(12, '/concursos/consultaDetalleCon.aspx?nog=1148753&o=9') # adjudicacion de contrato abierto
+#scrape_adjudicacion(13, '/concursos/consultaDetalleCon.aspx?nog=2347369&o=9') # multiples rubros de contrato abierto
 #scrape_adjudicacion(12, '/concursos/consultaDetalleCon.aspx?nog=4409892&o=9') # 1.1.16 un proveedor varios productos
 #load_assets.gen_csv(ADJUDICACIONES_DIARIAS.values(), ADJUDICACION_BODY.keys(), 'adjudicaciones/adjudicaciones3.csv', adj_writer)
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=6079695&o=9') # multiples proveedores y varios productos
