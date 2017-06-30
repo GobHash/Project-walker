@@ -461,6 +461,15 @@ def scrape_adjudicacion(nog, url):
 
     #lleno primera la info del comprador
     entidad_general = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_txtEntidad'})
+    cnt = 0
+    while entidad_general.string is None: # fix pirata xq es comun que truene en este elemento
+        logging.error('el tag de la entidad general venia vacio')
+        if cnt > 100:
+            raise ValueError('ERROR AL TRATAR DE CONSEGUIR EL ENTIDAD GENERAL')
+        contenido = obtain_html_content('GET', '{}{}'.format(BASE_URL, url))
+        soup = BeautifulSoup(contenido, 'lxml')
+        entidad_general = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_txtEntidad'})
+        cnt += 1
     comprador = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_txtUE'})
     text1 = obtain_tag_string(entidad_general)
     text2 = obtain_tag_string(comprador)
@@ -607,7 +616,7 @@ def scrape_adjudicacion(nog, url):
         tag = proveedor.contents[4]
         nueva_adj['monto'] = obtain_tag_string(tag)
         adjudicaciones.append(nueva_adj)
-
+    #print adjudicaciones
     ADJUDICACIONES_DIARIAS[nog] = adjudicaciones
 
 
@@ -791,6 +800,15 @@ def scrape_proveedor(nit, url):
 
     #nit
     tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_lblNIT'})
+    cnt = 0
+    while tag.string is None: # fix pirata xq es comun que truene en este elemento
+        logging.error('el tag de la entidad general venia vacio')
+        if cnt > 100:
+            raise ValueError('ERROR AL TRATAR DE CONSEGUIR EL NIT PROVEEDOR')
+        contenido = obtain_html_content('GET', '{}{}'.format(BASE_URL, url))
+        soup = BeautifulSoup(contenido, 'lxml')
+        tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_lblNIT'})
+        cnt += 1
     proveedor_actual['nit'] = obtain_tag_string(tag)
     # nombre
     tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_lblNombreProv'})
@@ -854,6 +872,7 @@ def scrape_proveedor(nit, url):
 #scrape_month(2016, '02')
 #print 'It took {0:0.1f} seconds'.format(time.time() - start)
 #scrape_month(2016, '02')
+#scrape_adjudicacion(12, '/concursos/consultaDetalleCon.aspx?nog=4679091&o=9')
 #scrape_adjudicacion(123,'/concursos/consultaDetalleCon.aspx?nog=667048&o=9') # contrato abierto sin productos
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4447441&o=9')
 #scrape_comprador('HOSPITAL DE SAN BENITO', 'MINISTERIO DE SALUD PÚBLICA','/compradores/consultaDetEnt.aspx?iUnt2=76&iEnt=9&iUnt=0&iTipo=4')
