@@ -496,20 +496,29 @@ def scrape_adjudicacion(nog, url):
         if totales is not None:
             init = totales.contents[0].index('de')
             fin = totales.contents[0].index('tipos')
+            total_dia = int(totales.contents[0][init+2:fin].strip())
+            num_pags = int(ceil(total_dia/5.))
         else: # hay veces que no hay cantidades /concursos/consultaDetalleCon.aspx?nog=667048&o=9
             obtener_cantidad = False
     else: # los contratos abiertos
         totales = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_lblFilasRubros'})
         if totales is not None: # se revisa xq hay contratos abiertos sin productos
-            init = totales.contents[0].index('de')
-            fin = totales.contents[0].index('rubros')
+            init = totales.contents[0].index('conteniendo')
+            fin = totales.contents[0].index('tipos')
+            total_dia = int(totales.contents[0][init+12:fin].strip())
+            num_pags = int(ceil(total_dia/5.))
         else:
             obtener_cantidad = False
 
     if obtener_cantidad:
-        total_dia = int(totales.contents[0][init+2:fin].strip())
-        num_pags = int(ceil(total_dia/5.))
-        # DEBUG STATEMENT PARA EL PAGINADOR 
+        adjudicacion['unidades'] = total_dia
+        # Esta parte comentada se puede usar para obtener informacion especifica de
+        # los productos que componen la adjudicacion
+        # lo que hay que arreglar es el algoritmo de paginacion para
+        # numeros mayores a 20 pags de productos.
+        """
+        #print total_dia
+        # DEBUG STATEMENT PARA EL PAGINADOR
         if num_pags > 19:
             with open('paginas.txt', 'a') as mydf:
                 mydf.write(url + '->')
@@ -565,7 +574,8 @@ def scrape_adjudicacion(nog, url):
                     my_params['__EVENTVALIDATION'] = new_tokens[2]
                 acumulados += obter_cantidad_productos(BeautifulSoup(content, 'lxml'))
         acumulados = acumulados[:-1] # quitar el ~ del final
-        adjudicacion['unidades'] = acumulados
+        """
+
     # fecha publicada
     tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_txtFechaPub'})
     if tag is not None:
@@ -879,7 +889,8 @@ def scrape_proveedor(nit, url):
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4380401&o=9') # 109 tipos distintos de productos
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4443454&o=9') # error en la obtencio del nit
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=4423550&o=9')
-#scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=1148753&o=9') # adjudicacion de contrato abierto
+scrape_adjudicacion(12, '/concursos/consultaDetalleCon.aspx?nog=1148753&o=9') # adjudicacion de contrato abierto
+scrape_adjudicacion(13, '/concursos/consultaDetalleCon.aspx?nog=2347369&o=9') # multiples rubros de contrato abierto
 #scrape_adjudicacion(12, '/concursos/consultaDetalleCon.aspx?nog=4409892&o=9') # 1.1.16 un proveedor varios productos
 #load_assets.gen_csv(ADJUDICACIONES_DIARIAS.values(), ADJUDICACION_BODY.keys(), 'adjudicaciones/adjudicaciones3.csv', adj_writer)
 #scrape_adjudicacion('/concursos/consultaDetalleCon.aspx?nog=6079695&o=9') # multiples proveedores y varios productos
