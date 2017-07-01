@@ -77,7 +77,7 @@ ADJUDICACION_BODY = {'nog': '',
                      'fecha_publicada':'null',
                      'fecha_presentacion_ofertas':'null',
                      'fecha_cierre_ofertas':'null',
-                     'tipo_ofertas':'',
+                     'tipo_ofertas':'null',
                      'fecha_adjudicada':'null',
                      'status':'',
                      'unidades':'null',
@@ -598,10 +598,12 @@ def scrape_adjudicacion(nog, url):
         adjudicacion['fecha_adjudicada'] = obtain_tag_string(tag)
     # tipo de ofertas
     tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_txtRecepcionOferta'}).find('b')
-    adjudicacion['tipo_ofertas'] = obtain_tag_string(tag)
+    if tag is not None:
+        adjudicacion['tipo_ofertas'] = obtain_tag_string(tag)
     # modalidad de compra
     tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_txtModalidad'})
-    adjudicacion['modalidad_compra'] = obtain_tag_string(tag)
+    if tag is not None:
+        adjudicacion['modalidad_compra'] = obtain_tag_string(tag)
     # categoria
     tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_txtCategoria'})
     if tag.string is None: # hay mas de una categoria
