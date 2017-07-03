@@ -597,9 +597,9 @@ def scrape_adjudicacion(nog, url):
     if tag is not None:
         adjudicacion['fecha_adjudicada'] = obtain_tag_string(tag)
     # tipo de ofertas
-    tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_txtRecepcionOferta'}).find('b')
+    tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_txtRecepcionOferta'})
     if tag is not None:
-        adjudicacion['tipo_ofertas'] = obtain_tag_string(tag)
+        adjudicacion['tipo_ofertas'] = obtain_tag_string(tag.find('b'))
     # modalidad de compra
     tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_txtModalidad'})
     if tag is not None:
