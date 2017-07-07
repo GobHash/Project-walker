@@ -462,7 +462,7 @@ def scrape_adjudicacion(nog, url):
     #lleno primera la info del comprador
     entidad_general = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_txtEntidad'})
     cnt = 0
-    while entidad_general.string is None: # fix pirata xq es comun que truene en este elemento
+    while entidad_general is None or entidad_general.string is None: # fix pirata xq es comun que truene en este elemento
         logging.error('el tag de la entidad general venia vacio')
         if cnt > 100:
             raise ValueError('ERROR AL TRATAR DE CONSEGUIR EL ENTIDAD GENERAL')
