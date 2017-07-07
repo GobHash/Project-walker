@@ -695,7 +695,7 @@ def scrape_comprador(entidad, unidad_compradora, url):
     # NIT
     tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_Lbl_Nit'})
     cnt = 0
-    while tag.string is None: # fix pirata xq es comun que truene en este elemento
+    while tag is None or tag.string is None: # fix pirata xq es comun que truene en este elemento
         logging.error('el tag del NIT venia vacio')
         if cnt > 100:
             raise ValueError('ERROR AL TRATAR DE CONSEGUIR EL NIT')
@@ -813,7 +813,7 @@ def scrape_proveedor(nit, url):
     #nit
     tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_lblNIT'})
     cnt = 0
-    while tag.string is None: # fix pirata xq es comun que truene en este elemento
+    while tag is None or tag.string is None: # fix pirata xq es comun que truene en este elemento
         logging.error('el tag de la entidad general venia vacio')
         if cnt > 100:
             raise ValueError('ERROR AL TRATAR DE CONSEGUIR EL NIT PROVEEDOR')
