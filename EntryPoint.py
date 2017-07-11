@@ -4,6 +4,7 @@ takes comand-line args as it follows:
 
 """
 import argparse
+import datetime
 import math
 import os
 import random
@@ -41,14 +42,12 @@ def main():
             open('adjudicaciones/adjudicaciones.csv', 'w').close()
 
     parser = argparse.ArgumentParser(description='Script to obtain information from guatecompras.gt and generate csv\'s with it')
-    parser.add_argument('year', help='year you wish to obtain data from',
+    parser.add_argument('-y', '--year', help='year you wish to obtain data from, if no year is specified then today\'s info is obtained',
                         type=int)
     parser.add_argument('-m', '--month', help='month you wish to obtain data from',
                         type=int)
     parser.add_argument('-d', '--day', help='day you wish to obtain data from',
                         type=int)
-    parser.add_argument('-w', '--wait', help='initial number of seconds to wait before reconnecting to host, will grow eventually',
-                        type=int, default=60)
     parser.add_argument('-v', "--verbose", type=int, choices=[1, 3],
                         default=3, help="increase output verbosity to log file (activity.log)")
     args = parser.parse_args()
@@ -57,12 +56,24 @@ def main():
     else:
         verbose = False
 
-    inicial = args.wait
-    m_year = args.year
-    if args.month < 10:
-        m_month = '0' + str(args.month)
+    inicial = 60
+    if args.year is None: # no viene el anio entonces voy a pedir solo el dia de hoy
+        fecha = datetime.date.today()
+        m_year = fecha.year
+        m_month = fecha.month
+        m_day = fecha.day
+    elif args.month is None: # no viene el mes -> pido todo el anio
+        m_year = args.year
+        m_month = 15
+        m_day = 33
+    elif args.day is None: # no viene el dia -> pido todo el mes
+        m_year = args.year
+        m_month = args.month
+        m_day = 33
     else:
-        m_month = str(args.month)
+        m_year = args.year
+        m_month = args.month
+        m_day = args.day
 
     continuar = True
     espera = inicial #segundos de espera inicial
@@ -72,9 +83,8 @@ def main():
     walker.cargar_compradores()
     while continuar:
         try:
-            walker.scrape_month(m_year, m_month)
+            walker.scrapedata(m_year, m_month, m_day)
             continuar = False
-            print 'el tiempo final de espera fue de {}'.format(espera)
 
         except (ex.ConnectTimeout, ex.ChunkedEncodingError, ex.ConnectionError) as la_exception:
             print 'hay aumento en el tiempo de espera'

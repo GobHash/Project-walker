@@ -128,63 +128,69 @@ def cargar_proveedores():
     global PROVEEDORES_LIST
     PROVEEDORES_LIST = load_assets.load_proveedores(PROVEEDOR_BODY)
 
-def scrapedata():
+def scrapedata(year, month, day):
     """
-    this
+    obtener la informacion para el rango
+    de tiempo solicitado
     """
-    continuar = raw_input("desea seguir con algun scrapping pendiente? (y/n)")
-    now = datetime.datetime.now()
-    logging.info('la corrida actual comienza el %s', str(now))
-    if  continuar == 'y':
-        #abrir el archivo que tiene la info de la sesion anterior y extraigo los datos necesarios
-        #para seguir en el punto donde se queda
-        fle = open('algo.txt')
-        fle.readlines()
-        #ScrapeYear("")
-    else:
-        year = raw_input("¿De que año desea obtener los datos de ajudicacion? (minimo 2004)\n")
-        try:
-            year = int(year)
-            scrapeyear(year, '01')
-        except ValueError as err:
-            print err.message
-
-
-def scrapeyear(year, mes='15'):
-    """
-    este metodo es el encargado de obtener la info del año solicitado
-    :param year: año que se va a obtener.
-    :param log: log posiblemente se quite en version final.
-    :param mes: el mes que se desea obtener, por defecto es 15 que significa todos los meses.
-    """
-
-    logging.info('Voy a obtener la info del año %s, en el mes %s', year, mes)
-    if mes == '15':
-        #hacer el for aqui
-        pass
-    else:
-        scrape_month(year, mes)
-
-
-def scrape_month(year, month):
-    """
-    metodo encargado de iterar sobre el mes recibido en los params
-    y generar los csv correspondientes
-    :param year: año para obtener.
-    :param month: el mes en especifico que se quiere obtener.
-    """
+    global COMPRADORES_LIST
+    global PROVEEDORES_LIST
     global ADJUDICACIONES_DIARIAS
-    global CAMPOS_ADJUDICACIONES
+    if month == 15: # voy a obtener todo el anio
+        for i in range(1, 13):
+            scrape_month(year, i)
+            prep_csv(COMPRADORES_LIST,
+                     COMPRADOR_BODY,
+                     'compradores/object/compradores.csv',
+                     comp_writer)
+            prep_csv(PROVEEDORES_LIST,
+                     PROVEEDOR_BODY,
+                     'proveedores/object/proveedores.csv',
+                     prov_writer)
+    elif day == 33: # obtener todo el mes
+        scrape_month(year, month)
+        prep_csv(COMPRADORES_LIST,
+                 COMPRADOR_BODY,
+                 'compradores/object/compradores.csv',
+                 comp_writer)
+        prep_csv(PROVEEDORES_LIST,
+                 PROVEEDOR_BODY,
+                 'proveedores/object/proveedores.csv',
+                 prov_writer)
+    else: # obtener solo un dia especifico
+        print 'obteniendo la info para el dia solicitado'
+        contenido = obtain_main_page()
+        scrape_day(day, month, year, obtain_tokens(contenido))
+
+        prep_csv(ADJUDICACIONES_DIARIAS,
+                 ADJUDICACION_BODY,
+                 'adjudicaciones/adjudicaciones.csv',
+                 adj_writer)
+        prep_csv(COMPRADORES_LIST,
+                 COMPRADOR_BODY,
+                 'compradores/object/compradores.csv',
+                 comp_writer)
+        prep_csv(PROVEEDORES_LIST,
+                 PROVEEDOR_BODY,
+                 'proveedores/object/proveedores.csv',
+                 prov_writer)
+        update_ultimo_exito(year, month, day)
+
+
+def obtain_main_page():
+    """
+    este metodo se encarga de obtener la pagina a partir
+    de la cual se hacen solicitan las adj. de los dias
+    de cualquier mes
+    """
+    
+    contenido = obtain_html_content('GET', MAIN_URL)
+
+    logging.info('Requeste de la main URL completado exitosamente')
+
     #comienzo obteniendo la info de la pag base desde donde voy a buscar
     #se manda este primer request para obtener los tokens que el servidor
     #necesita para enviar el resto de la info de manera correcta
-    #ver pag1.html
-
-    logging.info('Voy a hacer el GET de la main URL (pag1.html) para el  %s/%s', month, year)
-    contenido = obtain_html_content('GET', MAIN_URL)
-
-    logging.debug('Requeste de la main URL completado exitosamente')
-
     soup = BeautifulSoup(contenido, 'lxml')
     #saco los atributos que me sirven para que el server me devuelva los datos correctos
     viewstate = soup.find('input', attrs={'id': '__VIEWSTATE'}).get('value')
@@ -199,14 +205,25 @@ def scrape_month(year, month):
     my_params['__VIEWSTATEGENERATOR'] = viewstate_gen
     my_params['__EVENTVALIDATION'] = event_val
 
-    logging.debug('Voy a hacer el request del primer POST del mes %s', month)
+    #lo que hay en pag2.html
+    return obtain_html_content('POST', MAIN_URL, data=my_params)
 
-    contenido = obtain_html_content('POST', MAIN_URL, data=my_params)
+def scrape_month(year, month):
+    """
+    metodo encargado de iterar sobre el mes recibido en los params
+    y generar los csv correspondientes
+    :param year: año para obtener.
+    :param month: el mes en especifico que se quiere obtener.
+    """
+    global ADJUDICACIONES_DIARIAS
+    global CAMPOS_ADJUDICACIONES
+
+    contenido = obtain_main_page()
     tokens = obtain_tokens(contenido)
 
     logging.debug('ya fueron actualizados los tokens para el siguiente request(POST) del mes %s', month)
 
-    lista_dias = CALENDARIO.itermonthdates(year, int(month))
+    lista_dias = CALENDARIO.itermonthdates(year, month)
     ultimo_exito = []
     with open('ultimo_exito.txt', 'r') as mydf:
         ultimo_exito = mydf.read().split(',')
@@ -220,24 +237,24 @@ def scrape_month(year, month):
         hay_min = True
     ind = 1
     for mi_dia in lista_dias:
-        if ind > 3:
+        if ind > 1:
             break
-        el_mes = str(mi_dia)[5:7]
+        el_mes = int(str(mi_dia)[5:7])
         if el_mes == month: # hay dias que no son del mes actual, por el funcionamiento de las fechas en python
             print mi_dia
             #ind += 1
             if hay_min: # ya hay algun dia previo completado
-                if int(year) < min_year: #si el anio es mayor se sacan datos, de lo contrario se
+                if year < min_year: #si el anio es mayor se sacan datos, de lo contrario se
                     print 'la fecha solicitada({}/{}) es anterior a la ultima obtenida exitosamente'.format(str(mi_dia)[8:], month)
                     print 'edite el archivo ultimo_exito.txt para seguir adelante'
                     return
 
-                if int(month) < min_mes: # datos de un mes anterior
+                if month < min_mes: # datos de un mes anterior
                     print 'la fecha solicitada({}/{}) es anterior a la ultima obtenida exitosamente'.format(str(mi_dia)[8:], month)
                     print 'edite el archivo ultimo_exito.txt para seguir adelante'
                     return
                 else: #si hay cambio de mes, entonces el dia va a cambiar
-                    if int(month) > min_mes: # estoy en un mes posterior
+                    if month > min_mes: # estoy en un mes posterior
                         obtain_info = True
                     elif int(str(mi_dia)[8:]) > min_dia: # mismo mes
                         obtain_info = True
@@ -249,28 +266,42 @@ def scrape_month(year, month):
             start2 = time.time()
             scrape_day(str(mi_dia)[8:], month, year, tokens)
             print 'It took {0:0.1f} seconds'.format(time.time() - start2)
-            load_assets.gen_csv(ADJUDICACIONES_DIARIAS.values(),
-                                ADJUDICACION_BODY.keys(),
-                                'adjudicaciones/adjudicaciones.csv',
-                                adj_writer)
+            prep_csv(ADJUDICACIONES_DIARIAS,
+                     ADJUDICACION_BODY,
+                     'adjudicaciones/adjudicaciones.csv',
+                     adj_writer)
             logging.info('agregadas al csv las adjs')
-            ADJUDICACIONES_DIARIAS.clear()
-            with open('ultimo_exito.txt', 'w') as mydf:
-                min_date = '{},{},{}'.format(str(mi_dia)[8:], month, year)
-                mydf.write(min_date)
-                min_dia = int(str(mi_dia)[8:])
-                min_mes = int(month)
-                min_year = int(year)
-                hay_min = True
-                logging.info('actualizado el archivo de fechas')
+            update_ultimo_exito(year, month, str(mi_dia)[8:])
+            hay_min = True
             obtain_info = False
 
-    load_assets.gen_csv(COMPRADORES_LIST.values(),
-                        COMPRADOR_BODY.keys(),
-                        'compradores/object/compradores.csv',
-                        comp_writer)
-    # activar esta parte para escribir los proveedores
-    #load_assets.gen_csv(COMPRADORES_LIST, COMPRADOR_BODY.keys(), 'proveedores/object/proveedores.csv', prov_writer)
+def update_ultimo_exito(year, month, day):
+    """
+    actualiza el archivo auxiliar de fechas
+    """
+    with open('ultimo_exito.txt', 'w') as mydf:
+        min_date = '{},{},{}'.format(day, month, year)
+        mydf.write(min_date)
+        min_dia = int(day)
+        min_mes = int(month)
+        min_year = int(year)
+    logging.info('actualizado el archivo de fechas')
+
+def prep_csv(elements, keys, filedir, selector):
+    """
+    ejecuta el proceso que genera
+    los csv de provs y compradores
+    :param elements: diccionario que tiene los elementos por escribir
+    :param keys: las llaves de los diccionarios
+    :param file: la ruta del archivo destino
+    :param selector: la funcion que se encarga de filtrar la data para escribirla
+    """
+    load_assets.gen_csv(elements.values(),
+                        keys.keys(),
+                        filedir,
+                        selector)
+    elements.clear()
+
 
 def scrape_day(day, month, year, tokens):
     """
@@ -280,6 +311,14 @@ def scrape_day(day, month, year, tokens):
     :param year: año para obtener. ej: 2016
     :param tokens: el viewstate y otros elementos requeridos, es un array
     """
+    if day < 10:
+        day = '0' + str(day)
+    else:
+        day = str(day)
+    if month < 10:
+        month = '0' + str(month)
+    else:
+        month = str(month)
     logging.info('voy a obtener la info para el %s/%s/%s', day, month, year)
 
     my_params = POST_PARAMS.copy()
@@ -368,7 +407,7 @@ def scrape_day(day, month, year, tokens):
         tabla = soup.findAll('tr', attrs={'class': re.compile('TablaFilaMix.')})
         scrape_table(tabla)
 
-    logging.info('ya obtuve las adjudicaciones del dia')
+    logging.info('completadas las adjudicaciones del dia')
 
     """
     mydf = open('dias.txt', 'a')
@@ -388,10 +427,11 @@ def scrape_table(table):
     # link hacia la adj -> elem.contents[5].find('a').get('href')
     # nombre del proveedor -> elem.contents[2].find('a').string
     # NIT del proveedor -> elem.contents[3].string
-    #print elem.contents[5].find('a').get('href'), elem.contents[2].find('a').string, elem.contents[3].string
     for adjudicacion in table:
-        #scrape_proveedor(elem.contents[3].string.strip(), adjudicacion.contents[2].find('a').get('href'))
-        scrape_adjudicacion(obtain_tag_string(adjudicacion.contents[5].find('a')), adjudicacion.contents[5].find('a').get('href'))
+        scrape_proveedor(adjudicacion.contents[3].string.strip(),
+                         adjudicacion.contents[2].find('a').get('href'))
+        scrape_adjudicacion(obtain_tag_string(adjudicacion.contents[5].find('a')),
+                            adjudicacion.contents[5].find('a').get('href'))
 
 def obtain_tokens(contenido):
     """
@@ -445,7 +485,6 @@ def scrape_adjudicacion(nog, url):
     :param nog: el NOG de guatecompras, para verificar si ya fue obtenida
     :param url: url hacia la adjudicacion
     """
-    logging.debug(url)
     global COMPRADORES_LIST
     global ADJUDICACIONES_DIARIAS
 
@@ -517,7 +556,6 @@ def scrape_adjudicacion(nog, url):
         # lo que hay que arreglar es el algoritmo de paginacion para
         # numeros mayores a 20 pags de productos.
         """
-        #print total_dia
         # DEBUG STATEMENT PARA EL PAGINADOR
         if num_pags > 19:
             with open('paginas.txt', 'a') as mydf:
@@ -545,7 +583,6 @@ def scrape_adjudicacion(nog, url):
             my_params['MasterGC%24ContentBlockHolder%24Cpe_oferente_ClientState'] = 'false'
             my_params['MasterGC%24ContentBlockHolder%24Cpe_Contrato_ClientState'] = 'true' if num_pags > 10 else ''
             for pag_actual in range(2, num_pags+1):
-                #print pag_actual
                 if pag_actual < 12:# los numeros de pagina son absolutos
                     if pag_actual > 9:
                         my_params['MasterGC$ContentBlockHolder$ScriptManager1'] = 'MasterGC$ContentBlockHolder$PanelProductos|MasterGC$ContentBlockHolder$DGTipoProducto$ctl09$ctl{}'.format(pag_actual)
@@ -559,7 +596,6 @@ def scrape_adjudicacion(nog, url):
                     # con la expresion de abajo
                     if band:
                         la_pag = pag_actual - offset + 1
-                    #print la_pag
                     if la_pag > 9:
                         my_params['MasterGC$ContentBlockHolder$ScriptManager1'] = 'MasterGC$ContentBlockHolder$PanelProductos|MasterGC$ContentBlockHolder$DGTipoProducto$ctl09$ctl{}'.format(la_pag)
                         my_params['__EVENTTARGET'] = 'MasterGC$ContentBlockHolder$DGTipoProducto$ctl09$ctl{}'.format(la_pag)
@@ -628,7 +664,7 @@ def scrape_adjudicacion(nog, url):
         tag = proveedor.contents[4]
         nueva_adj['monto'] = obtain_tag_string(tag)
         adjudicaciones.append(nueva_adj)
-    #print adjudicaciones
+
     ADJUDICACIONES_DIARIAS[nog] = adjudicaciones
 
 
@@ -640,7 +676,7 @@ def obter_cantidad_productos(soup):
     :rtype string: string que tiene las cantidades encontradas
     """
     holder = ''
-    #print soup.find('tr', attrs={'class': 'TablaPagineo'})
+
     # este es para los contratos abiertos
     tag = soup.find('table', attrs={'id': 'MasterGC_ContentBlockHolder_DgRubros'})
     if tag is not None:
@@ -656,8 +692,8 @@ def obter_cantidad_productos(soup):
                 cant = tabla[i].find('span', attrs={'id': 'MasterGC_ContentBlockHolder_DGTipoProducto_ctl0{}_lblcant'.format(i+3)})
             else:
                 cant = tabla[i].find('span', attrs={'id': 'MasterGC_ContentBlockHolder_DGTipoProducto_ctl{}_lblcant'.format(i+3)})
-                #                                         'MasterGC_ContentBlockHolder_DGTipoProducto_ctl03_lblcant'
-            #print cant
+
+
             if cant is not None:
                 holder += obtain_tag_string(cant) + '~'
     return holder
@@ -674,8 +710,7 @@ def scrape_comprador(entidad, unidad_compradora, url):
     global COMPRADORES_LIST
 
     # reviso si ya tengo la info del comprador de manera local
-    #algo = COMPRADORES_LIST[entidad]
-    #print COMPRADORES_LIST[entidad]['unidades']
+
     obtener_origen_fondos = True
     if entidad in COMPRADORES_LIST:
         if unidad_compradora in COMPRADORES_LIST[entidad]['unidades']:
@@ -703,7 +738,7 @@ def scrape_comprador(entidad, unidad_compradora, url):
         soup = BeautifulSoup(contenido, 'lxml')
         tag = soup.find('span', attrs={'id': 'MasterGC_ContentBlockHolder_Lbl_Nit'})
         cnt += 1
-    #print tag
+
     comprador_actual['nit'] = obtain_tag_string(tag)
     # nombre de la unidad compradora
     tag = soup.find('tr', attrs={'id': 'MasterGC_ContentBlockHolder_trNit'}).next_sibling.next_sibling.contents[2]
@@ -866,9 +901,9 @@ def scrape_proveedor(nit, url):
                                                          obtain_tag_string(tag).strip())
                 proveedores.append(nuevo_prov)
         else:
-            proveedores.append(nuevo_prov)
+            proveedores.append(proveedor_actual)
     else:
-        proveedores.append(nuevo_prov)
+        proveedores.append(proveedor_actual)
 
     for prov in proveedores:
         campos['reps'].append(prov)
