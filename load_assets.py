@@ -138,8 +138,8 @@ def gen_csv(data, campos, file, selector):
             fieldnames = campos
             writer = csv.DictWriter(csvfile,
                                     fieldnames=fieldnames,
-                                    delimiter='|',
-                                    quoting=csv.QUOTE_MINIMAL)
+                                    quotechar='|',
+                                    quoting=csv.QUOTE_ALL)
             if len(contenido) < 1: # el archivo esta vacio
                 writer.writeheader()
             for element in data:
