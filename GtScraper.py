@@ -272,6 +272,9 @@ def scrape_month(year, month):
                      adj_writer)
             logging.info('agregadas al csv las adjs')
             update_ultimo_exito(year, month, str(mi_dia)[8:])
+            min_dia = int(str(mi_dia)[8:])
+            min_mes = int(month)
+            min_year = int(year)
             hay_min = True
             obtain_info = False
 
@@ -282,9 +285,6 @@ def update_ultimo_exito(year, month, day):
     with open('ultimo_exito.txt', 'w') as mydf:
         min_date = '{},{},{}'.format(day, month, year)
         mydf.write(min_date)
-        min_dia = int(day)
-        min_mes = int(month)
-        min_year = int(year)
     logging.info('actualizado el archivo de fechas')
 
 def prep_csv(elements, keys, filedir, selector):
