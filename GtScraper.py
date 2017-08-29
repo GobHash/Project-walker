@@ -492,6 +492,7 @@ def scrape_adjudicacion(nog, url):
         logging.info('informacion obtenida anteriormente')
         return
     logging.info('voy a pedir la info de una adjudicacion')
+    url = url.replace('consultaConcurso', 'consultaDetalleCon')
     contenido = obtain_html_content('GET', '{}{}'.format(BASE_URL, url))
     soup = BeautifulSoup(contenido, 'lxml')
 
