@@ -37,6 +37,7 @@ def main():
 
     if not os.path.exists('adjudicaciones'):
         os.makedirs('adjudicaciones')
+        open('adjudicaciones/adjudicaciones.csv', 'w').close()
     else: # ya existe el dir pero aseguramos crear el archivo
         if not os.path.isfile('adjudicaciones/adjudicaciones.csv'):
             open('adjudicaciones/adjudicaciones.csv', 'w').close()
