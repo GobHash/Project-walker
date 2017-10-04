@@ -159,9 +159,12 @@ def scrapedata(year, month, day):
                  prov_writer)
     else: # obtener solo un dia especifico
         print 'obteniendo la info para el dia solicitado'
+        start2 = time.time()
         contenido = obtain_main_page()
         scrape_day(day, month, year, obtain_tokens(contenido))
-
+        t2 = time.time() - start2
+        time_monitoring((day, month, year), t2)
+        print 'It took {0:0.1f} seconds'.format(t2)
         prep_csv(ADJUDICACIONES_DIARIAS,
                  ADJUDICACION_BODY,
                  'adjudicaciones/adjudicaciones.csv',
@@ -265,7 +268,9 @@ def scrape_month(year, month):
         if obtain_info:
             start2 = time.time()
             scrape_day(str(mi_dia)[8:], month, year, tokens)
-            print 'It took {0:0.1f} seconds'.format(time.time() - start2)
+            t2 = time.time() - start2
+            time_monitoring((str(mi_dia)[8:], month, year), t2)
+            print 'It took {0:0.1f} seconds'.format(t2)
             prep_csv(ADJUDICACIONES_DIARIAS,
                      ADJUDICACION_BODY,
                      'adjudicaciones/adjudicaciones.csv',
@@ -910,6 +915,14 @@ def scrape_proveedor(nit, url):
         campos['reps'].append(prov)
     PROVEEDORES_LIST[proveedor_actual['nit']] = campos
 
+
+def time_monitoring(date, time):
+    """
+    method to log how much time it took to obtain certain date
+    """
+    with open('time_log.txt', 'a') as time_file:
+        record = '{}-{}-{}|{}\n'.format(date[0],date[1],date[2], time)
+        time_file.write(record)
 
 # 12 de mayo de 2016 ese dia hay mas de 500 adj
 # lo que significa que se puede probar

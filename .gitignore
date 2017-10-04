@@ -8,3 +8,4 @@ compradores/object/*
 adjudicaciones/*
 *.pyc
 ultimo_exito.txt
+time_log.txt
