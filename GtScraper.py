@@ -20,6 +20,7 @@ from bs4 import BeautifulSoup
 import load_assets
 
 logging.basicConfig(filename='activity.log', level=logging.DEBUG)
+logging.getLogger("chardet").setLevel(logging.WARNING)
 logging.info('********************************nueva ejecucion del programa********************************')
 CALENDARIO = calendar.Calendar()
 MAIN_URL = 'http://guatecompras.gt/proveedores/consultaadvprovee.aspx'
