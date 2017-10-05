@@ -14,17 +14,21 @@ EntryPoint.py [-h] [-y YEAR] [-m MONTH] [-d DAY]
 ```cmd
 python EntryPoint.py -y 2016
 ```
-executing above command will obtain data for 2016 
+Executing above command will obtain data for 2016 
 ### Obtain a specific month
 ```cmd
 python EntryPoint.py -y 2016 -m 1
 ```
-executing above command will obtain data for January 2016
+Executing above command will obtain data for January 2016
 ### Obtain a specific day
 ```cmd
 python EntryPoint.py -y 2016 -m 1 -d 1
 ```
-executing above command will obtain data for January 1st 2016
+executing above command will obtain data for January 1st 2016, but if you wish to obtain today's data just pass no parameters to the script, just like the example below:
+
+```cmd
+python EntryPoint.py
+```
 
 After execution program will output 3 csv files: 
-**adjudicaciones.csv**, **compradores.csv**, **proveedores.csv**, column delimiter is '|'
+**adjudicaciones.csv**, **compradores.csv**, **proveedores.csv**, column delimiter is '|' and encoding is utf-8.
