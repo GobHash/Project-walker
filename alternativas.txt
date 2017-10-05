@@ -1,2 +1,0 @@
-una opcion que facilita completamente el trabajo es ir pidiendo las adjudicaciones de cada dia, con esto se evita ir teniendo
-ver todo el problema de las regex y los POST con los params que conlleva
