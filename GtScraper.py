@@ -277,6 +277,7 @@ def scrape_month(year, month):
                      'adjudicaciones/adjudicaciones.csv',
                      adj_writer)
             logging.info('agregadas al csv las adjs')
+            ADJUDICACIONES_DIARIAS.clear()
             update_ultimo_exito(year, month, str(mi_dia)[8:])
             min_dia = int(str(mi_dia)[8:])
             min_mes = int(month)
