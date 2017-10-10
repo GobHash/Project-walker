@@ -794,7 +794,8 @@ def obtain_tag_string(tag):
     :param tag: la etiqueta de la que vamos a extraer el texto
     :rtype string: string que representa lo encontrado
     """
-    return tag.string.encode('utf-8').strip()
+    return tag.string.encode('utf-8').strip().replace('|','')
+
 
 
 def obtain_html_content(request_type, url, data=None):
