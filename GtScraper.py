@@ -99,10 +99,12 @@ COMPRADOR_BODY = {'nit':'',
                   'departamento':'',
                   'municipio':'',
                   'entidad_superior': '',
-                  'origen_fondos':'null'}
+                  'origen_fondos':'null',
+                  'tipo_entidad': ''}
 # la estructura de la entidad general (Ministerio de la defensa, IGSS, etc.)
 TEMPLATE_COMPRADOR = {'unidades': {},
-                      'origen_fondos':'null'}
+                      'origen_fondos':'null',
+                      'tipo_entidad': ''}
 
 
 #estas lineas son para la carga de datos en masa
@@ -771,10 +773,16 @@ def scrape_comprador(entidad, unidad_compradora, url):
         if tag is not None:
             nueva_entidad['origen_fondos'] = obtain_tag_string(tag)
             comprador_actual['origen_fondos'] = obtain_tag_string(tag)
+        #tipo de entidad
+        tag = soup.find('tr', attrs={'id': 'MasterGC_ContentBlockHolder_trNit'}).next_sibling.next_sibling.contents[2]
+        if tag is not None:
+            nueva_entidad['tipo_entidad'] = obtain_tag_string(tag)
+            comprador_actual['tipo_entidad'] = obtain_tag_string(tag)
+
         COMPRADORES_LIST[entidad] = nueva_entidad
     else:
         comprador_actual['origen_fondos'] = COMPRADORES_LIST[entidad]['origen_fondos']
-
+        comprador_actual['tipo_entidad'] = COMPRADORES_LIST[entidad]['tipo_entidad']
 
     COMPRADORES_LIST[entidad]['unidades'][unidad_compradora] = comprador_actual
     return comprador_actual
